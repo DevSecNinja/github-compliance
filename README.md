@@ -70,7 +70,7 @@ The build script writes `public/build-meta.json` and generates `public/sw.js` fr
 
 The GitHub Pages workflow runs on pull requests and every commit to `main`. Pull requests run tests and build. Pushes to `main` also deploy `dist` to GitHub Pages.
 
-GitHub Pages is static, so production sign-in needs a tiny auth broker for the two device-flow token endpoints. Set `VITE_GITHUB_AUTH_BROKER_URL` during the Pages build to the broker origin. The broker must expose:
+GitHub Pages is static, so production sign-in needs a tiny auth broker for the two device-flow token endpoints. Set a repository or environment variable named `VITE_GITHUB_AUTH_BROKER_URL` before the Pages build so Vite can embed the broker origin. The broker must expose:
 
 - `POST /github-auth/device-code` -> `https://github.com/login/device/code`
 - `POST /github-auth/access-token` -> `https://github.com/login/oauth/access_token`

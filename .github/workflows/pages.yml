@@ -39,6 +39,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_GITHUB_AUTH_BROKER_URL: ${{ vars.VITE_GITHUB_AUTH_BROKER_URL }}
 
       - name: Upload artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
