@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">GitHub Compliance icon</title>
+  <defs>
+    <linearGradient id="paint" x1="64" x2="448" y1="64" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2f6fed" />
+      <stop offset="0.52" stop-color="#25bd9b" />
+      <stop offset="1" stop-color="#ff7a59" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#paint)" />
+  <path fill="#fff" d="M140 260c0-72 48-128 116-128 54 0 92 32 105 78h-67c-8-14-21-22-39-22-31 0-51 28-51 72s20 72 51 72c23 0 39-12 46-34h-57v-51h124v38c-9 61-54 103-113 103-67 0-115-56-115-128Z" />
+</svg>

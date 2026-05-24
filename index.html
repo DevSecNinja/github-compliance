@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A local-first GitHub compliance dashboard for repository governance." />
+    <meta name="theme-color" content="#4f7cff" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <title>GitHub Compliance</title>
+  </head>
+  <body>
+    <main id="auth-view" class="auth-shell" aria-labelledby="auth-title">
+      <section class="auth-panel">
+        <div class="brand-mark" aria-hidden="true">GC</div>
+        <h1 id="auth-title">Sign in to review your repositories.</h1>
+        <p class="lede">Use GitHub device flow. Repository data and scan history stay in this browser.</p>
+
+        <form id="client-form" class="stacked-form">
+          <div class="form-grid">
+            <label>
+              Owner
+              <input id="owner" name="owner" type="text" autocomplete="organization" required />
+            </label>
+            <label class="check-row">
+              <input id="remember-auth" name="remember" type="checkbox" />
+              Remember this device
+            </label>
+          </div>
+          <button class="primary-action" type="submit">Sign in with GitHub</button>
+        </form>
+
+        <section id="device-panel" class="device-panel" aria-labelledby="device-title" hidden>
+          <h2 id="device-title">Enter this code on GitHub</h2>
+          <div id="device-code" class="device-code" aria-live="polite">----</div>
+          <a id="device-link" class="secondary-action" href="https://github.com/login/device" target="_blank" rel="noreferrer">Open GitHub</a>
+          <p id="auth-status" class="status-copy" role="status">Waiting for GitHub authorization...</p>
+        </section>
+
+        <p id="auth-error" class="error-message" role="alert" hidden></p>
+      </section>
+    </main>
+
+    <main id="app-view" class="app-shell" hidden>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Repository control center</p>
+          <h1>Compliance dashboard</h1>
+        </div>
+        <div class="topbar-actions">
+          <select id="theme-select" aria-label="Theme">
+            <option value="auto">Auto</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <button id="sign-out" class="ghost-action" type="button">Sign out</button>
+        </div>
+      </header>
+
+      <section class="control-strip" aria-label="Scan controls">
+        <div>
+          <span class="label-text">Signed in as</span>
+          <strong id="viewer-login">-</strong>
+        </div>
+        <label>
+          Owner
+          <input id="scan-owner" type="text" />
+        </label>
+        <button id="include-archived" class="toggle-action" type="button" aria-pressed="false">Include archived</button>
+        <button id="scan-button" class="primary-action" type="button">Scan repositories</button>
+      </section>
+
+      <section class="status-line" aria-live="polite">
+        <span id="network-status">Online</span>
+        <span id="rate-limit">Rate limit unknown</span>
+        <span id="last-scan">No scan yet</span>
+        <span id="build-version">Version local</span>
+      </section>
+
+      <section class="summary-grid" aria-label="Compliance summary">
+        <article>
+          <span>Total</span>
+          <strong id="metric-total">0</strong>
+        </article>
+        <article>
+          <span>Ready</span>
+          <strong id="metric-ready">0</strong>
+        </article>
+        <article>
+          <span>Review</span>
+          <strong id="metric-review">0</strong>
+        </article>
+        <article>
+          <span>Needs work</span>
+          <strong id="metric-needs-work">0</strong>
+        </article>
+      </section>
+
+      <section class="recommendations" aria-labelledby="recommendations-title">
+        <h2 id="recommendations-title">Protection standard</h2>
+        <p>Fast scans avoid expensive ruleset calls. Protection appears as unknown until a deeper ruleset check is added.</p>
+      </section>
+
+      <section class="table-section" aria-labelledby="repo-table-title">
+        <div class="section-heading">
+          <h2 id="repo-table-title">Repositories</h2>
+          <p id="scan-progress">Ready to scan.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Repository</th>
+                <th scope="col">Description</th>
+                <th scope="col">Last push</th>
+                <th scope="col">Issues</th>
+                <th scope="col">Status</th>
+                <th scope="col">Checks</th>
+              </tr>
+            </thead>
+            <tbody id="repo-rows">
+              <tr>
+                <td colspan="6" class="empty-state">Scan repositories to see results.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="table-section" aria-labelledby="renovate-title">
+        <div class="section-heading">
+          <h2 id="renovate-title">Renovate pull requests</h2>
+          <p id="renovate-summary">No Renovate scan yet.</p>
+        </div>
+        <div id="renovate-list" class="renovate-list">
+          <p class="empty-state">Open Renovate pull requests will appear after a scan.</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/js/main.js"></script>
+  </body>
+</html>
