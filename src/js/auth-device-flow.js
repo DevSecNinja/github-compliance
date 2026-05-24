@@ -101,7 +101,7 @@ export class DeviceFlowAuth {
     }
 
     if (!response.ok) {
-      if (response.status === 404 && !appConfig.authBrokerBaseUrl) {
+      if (!appConfig.authBrokerBaseUrl) {
         throw new Error("GitHub sign-in needs an auth broker. Start the app with the VS Code task or configure VITE_GITHUB_AUTH_BROKER_URL for deployment.");
       }
 
