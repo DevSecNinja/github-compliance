@@ -24,13 +24,11 @@ permissions:
 jobs:
   pages:
     # renovate: datasource=github-tags depName=DevSecNinja/.github
-    uses: DevSecNinja/.github/.github/workflows/pages.yml@998ff283c3a431bbcb74421180121826cca8fdd7 # v1.4.0
+    uses: DevSecNinja/.github/.github/workflows/pages.yml@a8f6fb55948a23ca75c427a46dc00787b4bd5d70 # main
     permissions:
       contents: read
       deployments: write
-      id-token: write
       issues: write
-      pages: write
       pull-requests: write
     with:
       # renovate: datasource=node-version depName=node
@@ -44,4 +42,11 @@ jobs:
       build-command: >-
         VITE_GITHUB_AUTH_BROKER_URL="${{ vars.VITE_GITHUB_AUTH_BROKER_URL }}"
         npm run build
-      cloudflare-preview: false
+      github-pages: false
+      cloudflare-preview: true
+      cloudflare-production: true
+      cloudflare-project-name: "github-compliance"
+      cloudflare-production-branch: "main"
+    secrets:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
