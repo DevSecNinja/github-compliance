@@ -711,6 +711,17 @@ function selectTab(name) {
 
 function renderRateLimit(rateLimit) {
   const resource = rateLimit.resource || "core";
+  const previous = rateLimitBuckets.get(resource);
+  const isNewWindow = !previous || (rateLimit.reset && previous.reset && rateLimit.reset > previous.reset);
+
+  // Concurrent requests can return out of order, so only accept a higher
+  // `remaining` when the rate-limit window has rolled over. Otherwise the
+  // counter would visibly bounce up and down instead of monotonically
+  // decreasing through the current window.
+  if (!isNewWindow && previous && rateLimit.remaining > previous.remaining) {
+    return;
+  }
+
   rateLimitBuckets.set(resource, rateLimit);
 
   elements.rateLimit.textContent = [...rateLimitBuckets.entries()]
