@@ -12,12 +12,14 @@ export function classifyRenovatePullRequest(pullRequest, signals = renovateMerge
   const labels = (pullRequest.labels ?? []).map((label) => label.name ?? label).join("\n");
   const comments = (pullRequest.comments ?? []).map((comment) => comment.body ?? "").join("\n");
   const text = `${title}\n${body}\n${labels}\n${comments}`;
+  const normalizedText = text.replace(/[*_`]/g, "");
+  const searchableText = `${text}\n${normalizedText}`;
 
-  if (signals.manualMerge.some((pattern) => pattern.test(text))) {
+  if (signals.manualMerge.some((pattern) => pattern.test(searchableText))) {
     return "manual";
   }
 
-  if (signals.autoMerge.some((pattern) => pattern.test(text))) {
+  if (signals.autoMerge.some((pattern) => pattern.test(searchableText))) {
     return "auto";
   }
 

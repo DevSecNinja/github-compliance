@@ -48,7 +48,7 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByRole("button", { name: "Advanced scan" })).toBeEnabled();
   await page.getByRole("button", { name: "Advanced scan" }).click();
 
-  await expect(repoRows.getByText("Force pushes and deletion are blocked")).toBeVisible();
+  await expect(repoRows.getByText("Protection rulesets unavailable for private repositories")).toBeVisible();
   await expect(repoRows.getByText("2 open issues")).toBeVisible();
 });
 
@@ -62,7 +62,7 @@ test("keeps issue counts when rulesets are unavailable", async ({ page }) => {
 
   const repoRows = page.locator("#repo-rows");
   await expect(repoRows.getByText("2 open issues")).toBeVisible();
-  await expect(repoRows.getByText("Protection rulesets unavailable for this repository")).toBeVisible();
+  await expect(repoRows.getByText("Protection rulesets unavailable for private repositories")).toBeVisible();
   await expect(repoRows.getByText(/Advanced scan failed/)).toHaveCount(0);
 });
 

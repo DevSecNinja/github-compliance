@@ -21,6 +21,7 @@ export const renovateMergeSignals = {
   autoMerge: [
     /automerge\s*:\s*enabled/i,
     /automerge\s+enabled/i,
+    /automerge\W+enabled/i,
     /🚦\s*automerge\s*:\s*enabled/i,
     /auto-?merge\s+enabled/i,
     /merge:\s*auto/i,
