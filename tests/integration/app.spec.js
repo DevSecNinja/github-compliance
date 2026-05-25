@@ -9,6 +9,7 @@ test("signs in with device flow, scans repositories, and renders results", async
 
   await expect(page.getByText("Signed in as")).toBeVisible();
   await expect(page.getByRole("button", { name: "Advanced scan" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Refresh PRs" })).toBeDisabled();
   await page.getByRole("button", { name: "Scan repositories" }).click();
 
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
@@ -18,6 +19,9 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByText("search: 29 of 30 left")).toBeVisible();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Update archived dependency" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh PRs" })).toBeEnabled();
+  await page.getByRole("button", { name: "Refresh PRs" }).click();
+  await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Advanced scan" })).toBeEnabled();
   await page.getByRole("button", { name: "Advanced scan" }).click();

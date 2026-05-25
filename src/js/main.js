@@ -30,6 +30,7 @@ const elements = {
   rows: document.querySelector("#repo-rows"),
   renovateSummary: document.querySelector("#renovate-summary"),
   renovateList: document.querySelector("#renovate-list"),
+  refreshRenovateButton: document.querySelector("#refresh-renovate-button"),
   metrics: {
     total: document.querySelector("#metric-total"),
     ready: document.querySelector("#metric-ready"),
@@ -95,6 +96,7 @@ function bindEvents() {
 
   elements.scanButton.addEventListener("click", scan);
   elements.advancedScanButton.addEventListener("click", advancedScan);
+  elements.refreshRenovateButton.addEventListener("click", refreshRenovatePullRequests);
 }
 
 async function signIn() {
@@ -325,6 +327,30 @@ function renderScan(result, { cached = false } = {}) {
 
   renderRenovate(result.renovate);
   updateAdvancedScanButton();
+  updateRefreshRenovateButton();
+}
+
+async function refreshRenovatePullRequests() {
+  if (!client || !currentScanResult?.repositories?.length) {
+    return;
+  }
+
+  elements.refreshRenovateButton.disabled = true;
+  elements.renovateSummary.textContent = "Refreshing Renovate pull requests...";
+
+  try {
+    const renovate = await client.getRenovatePullRequestsSafely(currentScanResult.owner, currentScanResult.repositories);
+    currentScanResult = {
+      ...currentScanResult,
+      renovate
+    };
+    await saveScanSnapshot(currentScanResult.owner, currentScanResult);
+    renderRenovate(renovate);
+  } catch (error) {
+    renderRenovate({ total: 0, auto: 0, manual: 0, unknown: 0, pullRequests: [], error: cleanError(error) });
+  } finally {
+    updateRefreshRenovateButton();
+  }
 }
 
 function upsertRepository(result, repository) {
@@ -396,12 +422,16 @@ function renderCheck(check) {
 
 function renderRenovate(summary) {
   if (!summary) {
+    elements.renovateSummary.textContent = "Renovate PRs refresh after the fast scan completes.";
+    elements.renovateList.innerHTML = `<p class="empty-state">Open Renovate pull requests will appear after a scan.</p>`;
+    updateRefreshRenovateButton();
     return;
   }
 
   if (summary.error) {
     elements.renovateSummary.textContent = `Renovate PR scan failed: ${summary.error}`;
     elements.renovateList.innerHTML = `<p class="empty-state">Repository scan results are still shown.</p>`;
+    updateRefreshRenovateButton();
     return;
   }
 
@@ -409,6 +439,7 @@ function renderRenovate(summary) {
 
   if (summary.pullRequests.length === 0) {
     elements.renovateList.innerHTML = `<p class="empty-state">No open Renovate pull requests found.</p>`;
+    updateRefreshRenovateButton();
     return;
   }
 
@@ -424,6 +455,7 @@ function renderRenovate(summary) {
     `;
     return card;
   }));
+  updateRefreshRenovateButton();
 }
 
 function applySettings() {
@@ -456,6 +488,10 @@ function renderRateLimit(rateLimit) {
 
 function updateAdvancedScanButton() {
   elements.advancedScanButton.disabled = !client || !currentScanResult?.repositories?.length || elements.scanButton.disabled;
+}
+
+function updateRefreshRenovateButton() {
+  elements.refreshRenovateButton.disabled = !client || !currentScanResult?.repositories?.length;
 }
 
 function applyTheme(theme) {

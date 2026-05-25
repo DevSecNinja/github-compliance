@@ -322,7 +322,7 @@ export class GitHubClient {
   async getRenovatePullRequests(owner, repositories) {
     const query = encodeURIComponent(`org:${owner} is:pr is:open author:renovate[bot]`);
     const result = await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items");
-    const allowedRepositories = new Set(repositories.map((repo) => repo.full_name));
+    const allowedRepositories = new Set(repositories.map((repo) => repo.full_name ?? repo.fullName));
     const pullRequests = result.filter((item) => item.pull_request && allowedRepositories.has(repositoryFromApiUrl(item.repository_url)));
     const hydratedPullRequests = await mapLimit(pullRequests, 2, (pullRequest) => this.hydratePullRequestIssue(pullRequest));
     return summarizeRenovatePullRequests(hydratedPullRequests);
