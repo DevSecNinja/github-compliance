@@ -45,6 +45,24 @@ describe("Cloudflare Pages Worker", () => {
     assert.equal(await response.text(), "asset response");
   });
 
+  it("returns a JavaScript recovery module when a stale hashed asset falls through to HTML", async () => {
+    const response = await worker.fetch(
+      new Request("https://gh-compliance.ravensberg.org/assets/index-oldhash.js"),
+      assetEnv(new Response("<html>fallback</html>", { headers: { "Content-Type": "text/html" } }))
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Content-Type"), "application/javascript; charset=utf-8");
+    assert.equal(response.headers.get("X-Recovering-Asset"), "1");
+    assert.match(await response.text(), /location\.replace/);
+  });
+
+  it("prevents index and service worker responses from being stored by browser caches", async () => {
+    const response = await worker.fetch(new Request("https://gh-compliance.ravensberg.org/index.html"), assetEnv());
+
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+  });
+
   it("blocks unexpected cross-origin auth calls", async () => {
     const response = await worker.fetch(
       new Request("https://gh-compliance.ravensberg.org/github-auth/device-code", {
@@ -59,10 +77,10 @@ describe("Cloudflare Pages Worker", () => {
   });
 });
 
-function assetEnv() {
+function assetEnv(response = new Response("asset response")) {
   return {
     ASSETS: {
-      fetch: async () => new Response("asset response")
+      fetch: async () => response
     }
   };
 }

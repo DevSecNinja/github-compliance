@@ -60,7 +60,7 @@ async function networkFirst(request) {
 
   try {
     const response = await fetch(new Request(request, { cache: "no-cache" }));
-    if (response.ok) {
+    if (response.ok && !response.headers.get("X-Recovering-Asset")) {
       await cache.put(request, response.clone());
     }
     return response;
@@ -87,7 +87,7 @@ async function cacheFirst(request) {
 
   try {
     const response = await fetch(new Request(request, { cache: "no-cache" }));
-    if (response.ok) {
+    if (response.ok && !response.headers.get("X-Recovering-Asset")) {
       await cache.put(request, response.clone());
     }
     return response;

@@ -12,5 +12,6 @@ describe("service worker template", () => {
     assert.match(worker, /const isScript = url\.pathname\.endsWith\("\.js"\)/);
     assert.match(worker, /networkFirst\(request\)/);
     assert.match(worker, /cache: "no-cache"/);
+    assert.match(worker, /X-Recovering-Asset/);
   });
 });
