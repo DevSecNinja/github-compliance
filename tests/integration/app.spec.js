@@ -13,9 +13,10 @@ test("signs in with device flow, scans repositories, and renders results", async
   await page.getByRole("button", { name: "Scan repositories" }).click();
 
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
-  await expect(page.getByText("Renovate extends central config")).toBeVisible();
-  await expect(page.getByText("Protection not checked in fast scan")).toBeVisible();
-  await expect(page.getByText("Open issues not checked in fast scan")).toBeVisible();
+  const repoRows = page.locator("#repo-rows");
+  await expect(repoRows.getByText("Renovate extends central config")).toBeVisible();
+  await expect(repoRows.getByText("Protection not checked in fast scan")).toBeVisible();
+  await expect(repoRows.getByText("Open issues not checked in fast scan")).toBeVisible();
   await expect(page.getByText("Found 2 repositories; showing 1, excluding 1 archived.")).toBeVisible();
   await expect(page.getByText("search: 29 of 30 left")).toBeVisible();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
@@ -27,8 +28,8 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByRole("button", { name: "Advanced scan" })).toBeEnabled();
   await page.getByRole("button", { name: "Advanced scan" }).click();
 
-  await expect(page.getByText("Force pushes and deletion are blocked")).toBeVisible();
-  await expect(page.getByText("2 open issues")).toBeVisible();
+  await expect(repoRows.getByText("Force pushes and deletion are blocked")).toBeVisible();
+  await expect(repoRows.getByText("2 open issues")).toBeVisible();
 });
 
 test("excludes archived repositories by default and includes them on request", async ({ page }) => {
@@ -69,7 +70,17 @@ test("continues scanning when one repository fails", async ({ page }) => {
 
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
   await expect(page.getByRole("link", { name: "wazzup" })).toBeVisible();
-  await expect(page.getByText(/Scan failed:/)).toBeVisible();
+  await expect(page.locator("#repo-rows").getByText(/Scan failed:/)).toBeVisible();
+
+  await page.getByLabel("Status").selectOption("fail");
+  await expect(page.getByRole("link", { name: "wazzup" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "travel-prep" })).toHaveCount(0);
+
+  await page.getByLabel("Search").fill("scan failed");
+  await expect(page.getByRole("link", { name: "wazzup" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
 });
 
 test("stops new repository requests when rate limit is reached", async ({ page }) => {
@@ -81,7 +92,7 @@ test("stops new repository requests when rate limit is reached", async ({ page }
 
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
   await expect(page.getByText(/skipped by rate limit/i)).toBeVisible();
-  await expect(page.getByText(/Skipped because GitHub rate limit was reached/i)).toBeVisible();
+  await expect(page.locator("#repo-rows").getByText(/Skipped because GitHub rate limit was reached/i)).toBeVisible();
 });
 
 test("pauses a running fast scan", async ({ page }) => {

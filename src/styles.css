@@ -385,6 +385,15 @@ h2 {
   font-weight: 700;
 }
 
+.filter-strip {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 0.8rem;
+  align-items: end;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -484,6 +493,7 @@ th {
 @media (max-width: 820px) {
   .form-grid,
   .control-strip,
+  .filter-strip,
   .summary-grid {
     grid-template-columns: 1fr;
   }

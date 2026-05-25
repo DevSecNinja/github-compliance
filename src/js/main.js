@@ -28,6 +28,10 @@ const elements = {
   buildVersion: document.querySelector("#build-version"),
   progress: document.querySelector("#scan-progress"),
   rows: document.querySelector("#repo-rows"),
+  repoStatusFilter: document.querySelector("#repo-status-filter"),
+  repoCheckFilter: document.querySelector("#repo-check-filter"),
+  repoTextFilter: document.querySelector("#repo-text-filter"),
+  clearRepoFilters: document.querySelector("#clear-repo-filters"),
   renovateSummary: document.querySelector("#renovate-summary"),
   renovateList: document.querySelector("#renovate-list"),
   refreshRenovateButton: document.querySelector("#refresh-renovate-button"),
@@ -99,6 +103,15 @@ function bindEvents() {
   elements.scanButton.addEventListener("click", scan);
   elements.advancedScanButton.addEventListener("click", advancedScan);
   elements.refreshRenovateButton.addEventListener("click", refreshRenovatePullRequests);
+  elements.repoStatusFilter.addEventListener("change", () => renderCurrentScan());
+  elements.repoCheckFilter.addEventListener("change", () => renderCurrentScan());
+  elements.repoTextFilter.addEventListener("input", () => renderCurrentScan());
+  elements.clearRepoFilters.addEventListener("click", () => {
+    elements.repoStatusFilter.value = "all";
+    elements.repoCheckFilter.value = "all";
+    elements.repoTextFilter.value = "";
+    renderCurrentScan();
+  });
 }
 
 async function signIn() {
@@ -377,6 +390,8 @@ function pauseActiveScan(message) {
 
 function renderScan(result, { cached = false } = {}) {
   const repositories = result.repositories ?? [];
+  updateCheckFilterOptions(repositories);
+  const filteredRepositories = filterRepositories(repositories);
   const ready = repositories.filter((repo) => repo.status === "pass").length;
   const review = repositories.filter((repo) => repo.status === "warn").length;
   const needsWork = repositories.filter((repo) => repo.status === "fail").length;
@@ -386,17 +401,25 @@ function renderScan(result, { cached = false } = {}) {
   elements.metrics.review.textContent = review;
   elements.metrics.needsWork.textContent = needsWork;
   elements.lastScan.textContent = `${cached ? "Cached" : "Last"} scan ${new Date(result.scannedAt).toLocaleString()}`;
-  elements.progress.textContent = formatScanSummary(result, repositories.length);
+  elements.progress.textContent = formatScanSummary(result, repositories.length, filteredRepositories.length);
 
   if (repositories.length === 0) {
     elements.rows.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHtml(formatEmptyRepositoryMessage(result))}</td></tr>`;
+  } else if (filteredRepositories.length === 0) {
+    elements.rows.innerHTML = `<tr><td colspan="5" class="empty-state">No repositories match these filters.</td></tr>`;
   } else {
-    elements.rows.replaceChildren(...repositories.map(renderRepositoryRow));
+    elements.rows.replaceChildren(...filteredRepositories.map(renderRepositoryRow));
   }
 
   renderRenovate(result.renovate);
   updateAdvancedScanButton();
   updateRefreshRenovateButton();
+}
+
+function renderCurrentScan() {
+  if (currentScanResult) {
+    renderScan(currentScanResult);
+  }
 }
 
 async function refreshRenovatePullRequests() {
@@ -433,9 +456,9 @@ function upsertRepository(result, repository) {
   result.repositories.splice(index, 1, repository);
 }
 
-function formatScanSummary(result, visibleCount) {
+function formatScanSummary(result, visibleCount, filteredCount = visibleCount) {
   if (!result.inventory) {
-    return visibleCount ? `Showing ${visibleCount} repositories.` : "No repositories found.";
+    return visibleCount ? formatFilteredCount(visibleCount, filteredCount) : "No repositories found.";
   }
 
   const failedCount = (result.repositories ?? []).filter((repo) => repo.checks?.some((check) => check.id === "scan")).length;
@@ -444,7 +467,49 @@ function formatScanSummary(result, visibleCount) {
   const skippedText = skippedCount ? ` ${skippedCount} skipped by rate limit.` : "";
   const resetText = result.inventory.rateLimitResetAt ? ` Try again after ${new Date(result.inventory.rateLimitResetAt).toLocaleTimeString()}.` : "";
 
-  return `Found ${result.inventory.totalCount} repositories; showing ${visibleCount}${result.includeArchived ? "" : `, excluding ${result.inventory.archivedCount} archived`}.${failureText}${skippedText}${resetText}`;
+  return `Found ${result.inventory.totalCount} repositories; ${formatFilteredCount(visibleCount, filteredCount)}${result.includeArchived ? "" : `, excluding ${result.inventory.archivedCount} archived`}.${failureText}${skippedText}${resetText}`;
+}
+
+function formatFilteredCount(visibleCount, filteredCount) {
+  return filteredCount === visibleCount ? `showing ${visibleCount}` : `showing ${filteredCount} of ${visibleCount}`;
+}
+
+function filterRepositories(repositories) {
+  const status = elements.repoStatusFilter.value;
+  const check = elements.repoCheckFilter.value;
+  const query = elements.repoTextFilter.value.trim().toLowerCase();
+
+  return repositories.filter((repo) => {
+    const checks = getRepositoryCheckItems(repo);
+    const matchesStatus = status === "all" || repo.status === status;
+    const matchesCheck = check === "all" || checks.some((item) => item.label === check);
+    const searchable = [repo.name, repo.fullName, repo.description, repo.pushedLabel, statusText(repo.status), ...checks.map((item) => item.label)].join("\n").toLowerCase();
+    const matchesQuery = !query || searchable.includes(query);
+
+    return matchesStatus && matchesCheck && matchesQuery;
+  });
+}
+
+function updateCheckFilterOptions(repositories) {
+  const selected = elements.repoCheckFilter.value;
+  const labels = [...new Set(repositories.flatMap((repo) => getRepositoryCheckItems(repo).map((item) => item.label)))].sort((left, right) => left.localeCompare(right));
+
+  elements.repoCheckFilter.replaceChildren(
+    option("all", "All checks"),
+    ...labels.map((label) => option(label, label))
+  );
+  elements.repoCheckFilter.value = labels.includes(selected) ? selected : "all";
+}
+
+function getRepositoryCheckItems(repo) {
+  return [...(repo.checks ?? []), ...(repo.observations ?? [])];
+}
+
+function option(value, label) {
+  const item = document.createElement("option");
+  item.value = value;
+  item.textContent = label;
+  return item;
 }
 
 function formatEmptyRepositoryMessage(result) {
