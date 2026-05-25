@@ -42,6 +42,7 @@ let authState = loadAuthState();
 let auth = new DeviceFlowAuth();
 let client;
 let viewer;
+const rateLimitBuckets = new Map();
 
 bootstrap();
 
@@ -348,7 +349,13 @@ function renderArchivedToggle() {
 }
 
 function renderRateLimit(rateLimit) {
-  elements.rateLimit.textContent = `${rateLimit.remaining} of ${rateLimit.limit} API calls left`;
+  const resource = rateLimit.resource || "core";
+  rateLimitBuckets.set(resource, rateLimit);
+
+  elements.rateLimit.textContent = [...rateLimitBuckets.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, bucket]) => `${name}: ${bucket.remaining} of ${bucket.limit} left`)
+    .join(" · ");
 }
 
 function applyTheme(theme) {

@@ -5,7 +5,9 @@ import { classifyRenovatePullRequest, isRenovatePullRequest, summarizeRenovatePu
 describe("renovate pull request parsing", () => {
   it("detects Renovate pull requests", () => {
     assert.equal(isRenovatePullRequest({ user: { login: "renovate[bot]" }, title: "Update dependency", head: { ref: "main" } }), true);
+    assert.equal(isRenovatePullRequest({ user: { login: "renovate-bot" }, title: "Update dependency", head: { ref: "main" } }), true);
     assert.equal(isRenovatePullRequest({ user: { login: "octocat" }, title: "Feature", head: { ref: "feature" } }), false);
+    assert.equal(isRenovatePullRequest({ user: { login: "octocat" }, title: "Fix Renovate config", head: { ref: "renovate-config" } }), false);
   });
 
   it("classifies auto-merge and manual merge from text", () => {
@@ -18,6 +20,7 @@ describe("renovate pull request parsing", () => {
     const summary = summarizeRenovatePullRequests([
       { id: 1, number: 10, title: "Update vite", body: "Automerge: enabled", user: { login: "renovate[bot]" }, repository_url: "https://api.github.com/repos/DevSecNinja/app" },
       { id: 2, number: 11, title: "Update node", body: "Requires manual merge", user: { login: "renovate[bot]" }, repository_url: "https://api.github.com/repos/DevSecNinja/app" },
+      { id: 3, number: 75, title: "Fix Renovate docs", body: "Automerge: enabled", user: { login: "DevSecNinja" }, repository_url: "https://api.github.com/repos/DevSecNinja/.github" },
       { id: 3, number: 12, title: "Feature", body: "", user: { login: "octocat" }, repository_url: "https://api.github.com/repos/DevSecNinja/app" }
     ]);
 

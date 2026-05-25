@@ -274,7 +274,7 @@ export class GitHubClient {
   }
 
   async getRenovatePullRequests(owner) {
-    const query = encodeURIComponent(`org:${owner} is:pr is:open renovate`);
+    const query = encodeURIComponent(`org:${owner} is:pr is:open author:renovate[bot]`);
     const result = await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items");
     const pullRequests = result.filter((item) => item.pull_request);
     return summarizeRenovatePullRequests(pullRequests);
@@ -283,10 +283,9 @@ export class GitHubClient {
   captureRateLimit(response) {
     const limit = response.headers.get("X-RateLimit-Limit");
     const remaining = response.headers.get("X-RateLimit-Remaining");
-    const reset = response.headers.get("X-RateLimit-Reset");
 
-    if (limit && remaining && reset) {
-      this.onRateLimit?.({ limit: Number(limit), remaining: Number(remaining), reset: Number(reset) * 1000 });
+    if (limit && remaining) {
+      this.onRateLimit?.(parseRateLimit(response));
     }
   }
 }
@@ -400,6 +399,7 @@ function parseRateLimit(response) {
   return {
     limit: Number(response.headers.get("X-RateLimit-Limit") ?? 0),
     remaining: Number(response.headers.get("X-RateLimit-Remaining") ?? 0),
+    resource: response.headers.get("X-RateLimit-Resource") || "core",
     reset: resetHeader ? Number(resetHeader) * 1000 : null
   };
 }

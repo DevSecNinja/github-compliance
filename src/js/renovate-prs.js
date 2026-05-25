@@ -2,10 +2,8 @@ import { renovateMergeSignals } from "./config.js";
 
 export function isRenovatePullRequest(pullRequest) {
   const author = pullRequest.user?.login ?? "";
-  const title = pullRequest.title ?? "";
-  const branch = pullRequest.head?.ref ?? "";
 
-  return /renovate\[bot\]|renovate-bot|renovate/i.test(author) || /^renovate\//i.test(branch) || /renovate/i.test(title);
+  return /^(renovate\[bot\]|renovate-bot|renovate)$/i.test(author);
 }
 
 export function classifyRenovatePullRequest(pullRequest, signals = renovateMergeSignals) {

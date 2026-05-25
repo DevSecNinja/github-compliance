@@ -14,6 +14,7 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByText("Renovate extends central config")).toBeVisible();
   await expect(page.getByText("Protection not checked in fast scan")).toBeVisible();
   await expect(page.getByText("Found 2 repositories; showing 1, excluding 1 archived.")).toBeVisible();
+  await expect(page.getByText("search: 29 of 30 left")).toBeVisible();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
 });
 
@@ -150,9 +151,16 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
     }
 
     if (path === "/search/issues" && query.includes("is:pr")) {
+      expect(query).toContain("author:renovate[bot]");
       await route.fulfill({
+        headers: {
+          "Access-Control-Expose-Headers": "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Resource",
+          "X-RateLimit-Limit": "30",
+          "X-RateLimit-Remaining": "29",
+          "X-RateLimit-Resource": "search"
+        },
         json: {
-          total_count: 1,
+          total_count: 2,
           items: [
             {
               id: 100,
@@ -163,6 +171,17 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
               repository_url: "https://api.github.com/repos/DevSecNinja/travel-prep",
               updated_at: "2026-05-24T10:00:00Z",
               user: { login: "renovate[bot]" },
+              pull_request: {}
+            },
+            {
+              id: 101,
+              number: 75,
+              title: "Fix Renovate config",
+              body: "Automerge: enabled",
+              html_url: "https://github.com/DevSecNinja/.github/pull/75",
+              repository_url: "https://api.github.com/repos/DevSecNinja/.github",
+              updated_at: "2026-05-24T10:00:00Z",
+              user: { login: "DevSecNinja" },
               pull_request: {}
             }
           ]
