@@ -270,7 +270,9 @@ export class GitHubClient {
   async advancedScanRepository(repository, options = {}) {
     const [owner, repo] = repository.fullName.split("/");
     const [rulesets, issueCount] = await Promise.all([
-      this.getRulesetsForAdvancedScan(owner, repo, options),
+      repository.private
+        ? "Protection rulesets unavailable for private repositories"
+        : this.getRulesetsForAdvancedScan(owner, repo, options),
       this.getOpenIssueCount(owner, repo, options)
     ]);
 
