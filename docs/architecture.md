@@ -91,6 +91,7 @@ Report-only observations:
 This repository consumes central automation from `DevSecNinja/.github`:
 
 - Reusable Pages workflow for PR validation and Cloudflare Pages deployment.
+- Cloudflare Pages Worker in `public/_worker.js` for same-origin GitHub device-flow auth forwarding.
 - Reusable lint workflow for shared repository hygiene checks.
 - Reusable config-sync workflow for central config drift PRs.
 - Shared Renovate presets through `renovate.json5`.

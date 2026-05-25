@@ -94,7 +94,7 @@ export class DeviceFlowAuth {
       });
     } catch (error) {
       if (error instanceof TypeError) {
-        throw new Error("GitHub sign-in needs an auth broker. Start the app with the VS Code task or configure VITE_GITHUB_AUTH_BROKER_URL for deployment.");
+        throw new Error("GitHub sign-in endpoint is unavailable. Redeploy Cloudflare Pages so the /github-auth/* Worker route is active, or configure VITE_GITHUB_AUTH_BROKER_URL for an external broker.");
       }
 
       throw error;
@@ -102,7 +102,7 @@ export class DeviceFlowAuth {
 
     if (!response.ok) {
       if (!appConfig.authBrokerBaseUrl) {
-        throw new Error("GitHub sign-in needs an auth broker. Start the app with the VS Code task or configure VITE_GITHUB_AUTH_BROKER_URL for deployment.");
+        throw new Error("GitHub sign-in endpoint is unavailable. Redeploy Cloudflare Pages so the /github-auth/* Worker route is active, or configure VITE_GITHUB_AUTH_BROKER_URL for an external broker.");
       }
 
       throw new Error(`GitHub authorization returned ${response.status}.`);

@@ -72,10 +72,12 @@ The Pages workflow runs on pull requests and every commit to `main`. Pull reques
 
 This repository uses the central `DevSecNinja/.github` reusable Pages workflow, lint workflow, config-sync workflow, Renovate presets, and config files. Reusable workflow refs are pinned to a release SHA and annotated for Renovate updates.
 
-Production hosting is static, so sign-in needs a tiny auth broker for the two device-flow token endpoints. Set a repository or environment variable named `VITE_GITHUB_AUTH_BROKER_URL` before the Pages build so Vite can embed the broker origin. The central Pages workflow passes that variable into `npm run build`. The broker must expose:
+Cloudflare Pages serves `public/_worker.js` as the same-origin auth broker for the two device-flow token endpoints:
 
 - `POST /github-auth/device-code` -> `https://github.com/login/device/code`
 - `POST /github-auth/access-token` -> `https://github.com/login/oauth/access_token`
+
+`VITE_GITHUB_AUTH_BROKER_URL` is optional. Leave it empty for same-origin Cloudflare Pages routing, or set it when using a separate broker origin.
 
 Required repository secrets for Cloudflare deployment:
 
@@ -86,4 +88,4 @@ The Cloudflare token needs permission to deploy Cloudflare Pages for the account
 
 ## Security Notes
 
-The browser never receives a GitHub App private key or client secret. Device flow uses the public Client ID. The auth broker forwards device-code and refresh-token exchange only. Repository scan data still remains local in the browser.
+The browser never receives a GitHub App private key or client secret. Device flow uses the public Client ID. The Cloudflare Pages Worker forwards device-code and refresh-token exchange only. Repository scan data still remains local in the browser.
