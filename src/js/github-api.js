@@ -270,11 +270,23 @@ export class GitHubClient {
   async advancedScanRepository(repository, options = {}) {
     const [owner, repo] = repository.fullName.split("/");
     const [rulesets, issueCount] = await Promise.all([
-      this.getRulesets(owner, repo, options),
+      this.getRulesetsForAdvancedScan(owner, repo, options),
       this.getOpenIssueCount(owner, repo, options)
     ]);
 
     return applyAdvancedChecks(repository, { rulesets, issueCount });
+  }
+
+  async getRulesetsForAdvancedScan(owner, repo, options = {}) {
+    try {
+      return await this.getRulesets(owner, repo, options);
+    } catch (error) {
+      if (rulesetsUnavailable(error)) {
+        return "Protection rulesets unavailable for this repository";
+      }
+
+      throw error;
+    }
   }
 
   async getComplianceFiles(repo, options = {}) {
@@ -531,6 +543,10 @@ function parseRateLimit(response) {
     resource: response.headers.get("X-RateLimit-Resource") || "core",
     reset: resetHeader ? Number(resetHeader) * 1000 : null
   };
+}
+
+function rulesetsUnavailable(error) {
+  return error?.status === 403 && /Upgrade to GitHub Pro|enable this feature|rulesets/i.test(error.message);
 }
 
 function formatMissingInstallationMessage(owner, installations) {

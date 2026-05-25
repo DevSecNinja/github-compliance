@@ -52,6 +52,20 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(repoRows.getByText("2 open issues")).toBeVisible();
 });
 
+test("keeps issue counts when rulesets are unavailable", async ({ page }) => {
+  await mockGitHub(page, { rulesetsUnavailable: true });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+  await page.getByRole("button", { name: "Scan repositories" }).click();
+  await page.getByRole("button", { name: "Advanced scan" }).click();
+
+  const repoRows = page.locator("#repo-rows");
+  await expect(repoRows.getByText("2 open issues")).toBeVisible();
+  await expect(repoRows.getByText("Protection rulesets unavailable for this repository")).toBeVisible();
+  await expect(repoRows.getByText(/Advanced scan failed/)).toHaveCount(0);
+});
+
 test("excludes archived repositories by default and includes them on request", async ({ page }) => {
   await mockGitHub(page);
   await page.goto("/");
@@ -130,7 +144,7 @@ test("pauses a running fast scan", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Scan repositories" })).toBeVisible();
 });
 
-async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo, delayTree = false } = {}) {
+async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo, delayTree = false, rulesetsUnavailable = false } = {}) {
   const encodedRenovate = btoa('extends: ["github>DevSecNinja/.github//.renovate/base.json5"]');
   const encodedReadme = btoa("# Travel Prep");
   const encodedLicense = btoa("MIT");
@@ -209,6 +223,18 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
     }
 
     if (path.endsWith("/rulesets")) {
+      if (rulesetsUnavailable) {
+        await route.fulfill({
+          status: 403,
+          json: {
+            message: "Upgrade to GitHub Pro or make this repository public to enable this feature.",
+            documentation_url: "https://docs.github.com/rest/repos/rules#get-all-repository-rulesets",
+            status: "403"
+          }
+        });
+        return;
+      }
+
       await route.fulfill({ json: [ruleset()] });
       return;
     }

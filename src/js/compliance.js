@@ -70,7 +70,7 @@ export function evaluateRulesets(rulesets = [], defaultBranch = "main") {
   if (!Array.isArray(rulesets)) {
     return {
       status: "unknown",
-      label: "Protection not checked in fast scan",
+      label: typeof rulesets === "string" ? rulesets : "Protection not checked in fast scan",
       missing: [],
       report: []
     };
@@ -189,6 +189,7 @@ export function applyAdvancedChecks(repository, { rulesets, issueCount }) {
         status: issueCount === null || issueCount === undefined ? "unknown" : "info",
         label: issueCount === null || issueCount === undefined ? "Open issues not checked in fast scan" : `${issueCount} open issue${issueCount === 1 ? "" : "s"}`
       },
+      ...(protection.status === "unknown" ? [{ id: "protection", status: "unknown", label: protection.label }] : []),
       ...protection.report.map((label, index) => ({ id: `protection-report-${index}`, status: "info", label }))
     ]);
 
