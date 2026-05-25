@@ -13,6 +13,8 @@ describe("Pages workflow", () => {
     assert.match(workflow, /cloudflare-production: true/);
     assert.match(workflow, /cloudflare-project-name: "github-compliance"/);
     assert.match(workflow, /cloudflare-production-branch: "main"/);
+    assert.match(workflow, /id-token: write/);
+    assert.match(workflow, /pages: write/);
     assert.match(workflow, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/);
     assert.match(workflow, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
     assert.doesNotMatch(workflow, /<<<<<<<|=======|>>>>>>>/);

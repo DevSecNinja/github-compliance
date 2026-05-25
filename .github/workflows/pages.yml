@@ -28,7 +28,9 @@ jobs:
     permissions:
       contents: read
       deployments: write
+      id-token: write
       issues: write
+      pages: write
       pull-requests: write
     with:
       # renovate: datasource=node-version depName=node
