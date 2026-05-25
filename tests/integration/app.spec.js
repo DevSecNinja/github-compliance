@@ -15,6 +15,7 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
   await expect(page.getByText("Renovate extends central config")).toBeVisible();
   await expect(page.getByText("Protection not checked in fast scan")).toBeVisible();
+  await expect(page.getByText("Open issues not checked in fast scan")).toBeVisible();
   await expect(page.getByText("Found 2 repositories; showing 1, excluding 1 archived.")).toBeVisible();
   await expect(page.getByText("search: 29 of 30 left")).toBeVisible();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();

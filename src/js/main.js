@@ -389,7 +389,7 @@ function renderScan(result, { cached = false } = {}) {
   elements.progress.textContent = formatScanSummary(result, repositories.length);
 
   if (repositories.length === 0) {
-    elements.rows.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(formatEmptyRepositoryMessage(result))}</td></tr>`;
+    elements.rows.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHtml(formatEmptyRepositoryMessage(result))}</td></tr>`;
   } else {
     elements.rows.replaceChildren(...repositories.map(renderRepositoryRow));
   }
@@ -472,7 +472,6 @@ function renderRepositoryRow(repo) {
     </td>
     <td>${escapeHtml(repo.description)}</td>
     <td>${escapeHtml(repo.pushedLabel)}</td>
-    <td>${repo.issueCount ?? "Unknown"}</td>
     <td><span class="status-pill ${repo.status}">${statusText(repo.status)}</span></td>
     <td><div class="check-list"></div></td>
   `;

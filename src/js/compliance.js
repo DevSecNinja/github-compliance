@@ -146,7 +146,7 @@ export function evaluateRepository({ repo, files, rulesets, issueCount, now = ne
     {
       id: "issues",
       status: issueCount === null || issueCount === undefined ? "unknown" : "info",
-      label: issueCount === null || issueCount === undefined ? "Open issues unknown" : `${issueCount} open issue${issueCount === 1 ? "" : "s"}`
+      label: issueCount === null || issueCount === undefined ? "Open issues not checked in fast scan" : `${issueCount} open issue${issueCount === 1 ? "" : "s"}`
     },
     ...(protection.status === "unknown" ? [{ id: "protection", status: "unknown", label: protection.label }] : []),
     ...protection.report.map((label) => ({ id: label.toLowerCase().replaceAll(" ", "-"), status: "info", label }))
@@ -187,7 +187,7 @@ export function applyAdvancedChecks(repository, { rulesets, issueCount }) {
       {
         id: "issues",
         status: issueCount === null || issueCount === undefined ? "unknown" : "info",
-        label: issueCount === null || issueCount === undefined ? "Open issues unknown" : `${issueCount} open issue${issueCount === 1 ? "" : "s"}`
+        label: issueCount === null || issueCount === undefined ? "Open issues not checked in fast scan" : `${issueCount} open issue${issueCount === 1 ? "" : "s"}`
       },
       ...protection.report.map((label, index) => ({ id: `protection-report-${index}`, status: "info", label }))
     ]);
