@@ -387,7 +387,16 @@ h2 {
 
 .filter-strip {
   display: grid;
-  grid-template-columns: minmax(130px, 180px) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(120px, 160px) minmax(180px, 1fr) minmax(160px, 220px) minmax(180px, 1fr) auto;
+  gap: 0.8rem;
+  align-items: end;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.renovate-filter-strip {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(180px, 1fr) auto;
   gap: 0.8rem;
   align-items: end;
   padding: 1rem 1.2rem;
@@ -494,6 +503,7 @@ th {
   .form-grid,
   .control-strip,
   .filter-strip,
+  .renovate-filter-strip,
   .summary-grid {
     grid-template-columns: 1fr;
   }

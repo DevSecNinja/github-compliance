@@ -20,7 +20,21 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByText("Found 2 repositories; showing 1, excluding 1 archived.")).toBeVisible();
   await expect(page.getByText("search: 29 of 30 left")).toBeVisible();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
+  await expect(page.getByText("No Renovate pull requests match these filters.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Update dependency vite" })).toHaveCount(0);
+  await page.getByLabel("Merge type").selectOption("all");
+  await expect(page.getByRole("link", { name: "Update dependency vite" })).toBeVisible();
+  await page.getByLabel("Merge type").selectOption("auto");
+  await expect(page.getByRole("link", { name: "Update dependency vite" })).toBeVisible();
+  await page.getByLabel("Merge type").selectOption("actionable");
   await expect(page.getByRole("link", { name: "Update archived dependency" })).toHaveCount(0);
+  await expect(page.getByLabel("Check").locator("option", { hasText: /Last push/ })).toHaveCount(0);
+  const repositoryFilters = page.locator(".filter-strip");
+  await repositoryFilters.getByLabel("Last push").selectOption("today");
+  await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
+  await repositoryFilters.getByLabel("Last push").selectOption("older");
+  await expect(page.getByRole("link", { name: "travel-prep" })).toHaveCount(0);
+  await repositoryFilters.getByRole("button", { name: "Clear filters" }).click();
   await expect(page.getByRole("button", { name: "Refresh PRs" })).toBeEnabled();
   await page.getByRole("button", { name: "Refresh PRs" }).click();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
@@ -72,14 +86,15 @@ test("continues scanning when one repository fails", async ({ page }) => {
   await expect(page.getByRole("link", { name: "wazzup" })).toBeVisible();
   await expect(page.locator("#repo-rows").getByText(/Scan failed:/)).toBeVisible();
 
-  await page.getByLabel("Status").selectOption("fail");
+  const repositoryFilters = page.locator(".filter-strip");
+  await repositoryFilters.getByLabel("Status").selectOption("fail");
   await expect(page.getByRole("link", { name: "wazzup" })).toBeVisible();
   await expect(page.getByRole("link", { name: "travel-prep" })).toHaveCount(0);
 
-  await page.getByLabel("Search").fill("scan failed");
+  await repositoryFilters.getByLabel("Search").fill("scan failed");
   await expect(page.getByRole("link", { name: "wazzup" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Clear filters" }).click();
+  await repositoryFilters.getByRole("button", { name: "Clear filters" }).click();
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
 });
 
@@ -244,7 +259,12 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
     }
 
     if (path === "/repos/DevSecNinja/travel-prep/issues/22") {
-      await route.fulfill({ json: { body: "🚦 Automerge: Enabled.", labels: [{ name: "merge: auto" }] } });
+      await route.fulfill({ json: { body: "Dependency update", labels: [] } });
+      return;
+    }
+
+    if (path === "/repos/DevSecNinja/travel-prep/issues/22/comments") {
+      await route.fulfill({ json: [{ body: "🚦 Automerge: Enabled." }] });
       return;
     }
 
@@ -288,7 +308,7 @@ function repository(name, archived) {
     archived,
     private: true,
     default_branch: "main",
-    pushed_at: "2026-05-24T10:00:00Z",
+    pushed_at: new Date().toISOString(),
     license: { spdx_id: "MIT" },
     owner: { login: "DevSecNinja" }
   };

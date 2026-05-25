@@ -30,10 +30,14 @@ const elements = {
   rows: document.querySelector("#repo-rows"),
   repoStatusFilter: document.querySelector("#repo-status-filter"),
   repoCheckFilter: document.querySelector("#repo-check-filter"),
+  repoPushFilter: document.querySelector("#repo-push-filter"),
   repoTextFilter: document.querySelector("#repo-text-filter"),
   clearRepoFilters: document.querySelector("#clear-repo-filters"),
   renovateSummary: document.querySelector("#renovate-summary"),
   renovateList: document.querySelector("#renovate-list"),
+  renovateMergeFilter: document.querySelector("#renovate-merge-filter"),
+  renovateTextFilter: document.querySelector("#renovate-text-filter"),
+  clearRenovateFilters: document.querySelector("#clear-renovate-filters"),
   refreshRenovateButton: document.querySelector("#refresh-renovate-button"),
   metrics: {
     total: document.querySelector("#metric-total"),
@@ -103,12 +107,21 @@ function bindEvents() {
   elements.scanButton.addEventListener("click", scan);
   elements.advancedScanButton.addEventListener("click", advancedScan);
   elements.refreshRenovateButton.addEventListener("click", refreshRenovatePullRequests);
+  elements.renovateMergeFilter.addEventListener("change", () => renderCurrentRenovate());
+  elements.renovateTextFilter.addEventListener("input", () => renderCurrentRenovate());
+  elements.clearRenovateFilters.addEventListener("click", () => {
+    elements.renovateMergeFilter.value = "actionable";
+    elements.renovateTextFilter.value = "";
+    renderCurrentRenovate();
+  });
   elements.repoStatusFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoCheckFilter.addEventListener("change", () => renderCurrentScan());
+  elements.repoPushFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoTextFilter.addEventListener("input", () => renderCurrentScan());
   elements.clearRepoFilters.addEventListener("click", () => {
     elements.repoStatusFilter.value = "all";
     elements.repoCheckFilter.value = "all";
+    elements.repoPushFilter.value = "all";
     elements.repoTextFilter.value = "";
     renderCurrentScan();
   });
@@ -422,6 +435,12 @@ function renderCurrentScan() {
   }
 }
 
+function renderCurrentRenovate() {
+  if (currentScanResult?.renovate) {
+    renderRenovate(currentScanResult.renovate);
+  }
+}
+
 async function refreshRenovatePullRequests() {
   if (!client || !currentScanResult?.repositories?.length) {
     return;
@@ -477,16 +496,18 @@ function formatFilteredCount(visibleCount, filteredCount) {
 function filterRepositories(repositories) {
   const status = elements.repoStatusFilter.value;
   const check = elements.repoCheckFilter.value;
+  const lastPush = elements.repoPushFilter.value;
   const query = elements.repoTextFilter.value.trim().toLowerCase();
 
   return repositories.filter((repo) => {
     const checks = getRepositoryCheckItems(repo);
     const matchesStatus = status === "all" || repo.status === status;
     const matchesCheck = check === "all" || checks.some((item) => item.label === check);
+    const matchesLastPush = lastPush === "all" || pushBucket(repo.pushedAt) === lastPush;
     const searchable = [repo.name, repo.fullName, repo.description, repo.pushedLabel, statusText(repo.status), ...checks.map((item) => item.label)].join("\n").toLowerCase();
     const matchesQuery = !query || searchable.includes(query);
 
-    return matchesStatus && matchesCheck && matchesQuery;
+    return matchesStatus && matchesCheck && matchesLastPush && matchesQuery;
   });
 }
 
@@ -502,7 +523,37 @@ function updateCheckFilterOptions(repositories) {
 }
 
 function getRepositoryCheckItems(repo) {
-  return [...(repo.checks ?? []), ...(repo.observations ?? [])];
+  return [...(repo.checks ?? []), ...(repo.observations ?? []).filter((item) => item.id !== "last-push")];
+}
+
+function pushBucket(value, now = new Date()) {
+  if (!value) {
+    return "older";
+  }
+
+  const pushed = new Date(value);
+  if (Number.isNaN(pushed.getTime())) {
+    return "older";
+  }
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfToday.getDate() - ((startOfToday.getDay() + 6) % 7));
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  if (pushed >= startOfToday) {
+    return "today";
+  }
+
+  if (pushed >= startOfWeek) {
+    return "week";
+  }
+
+  if (pushed >= startOfMonth) {
+    return "month";
+  }
+
+  return "older";
 }
 
 function option(value, label) {
@@ -568,7 +619,9 @@ function renderRenovate(summary) {
     return;
   }
 
-  elements.renovateSummary.textContent = `${summary.total} open. ${summary.auto} auto-merge, ${summary.manual} manual, ${summary.unknown} unknown.`;
+  const filteredPullRequests = filterRenovatePullRequests(summary.pullRequests);
+  const filterText = filteredPullRequests.length === summary.pullRequests.length ? "" : ` Showing ${filteredPullRequests.length} of ${summary.pullRequests.length}.`;
+  elements.renovateSummary.textContent = `${summary.total} open. ${summary.auto} auto-merge, ${summary.manual} manual, ${summary.unknown} unknown.${filterText}`;
 
   if (summary.pullRequests.length === 0) {
     elements.renovateList.innerHTML = `<p class="empty-state">No open Renovate pull requests found.</p>`;
@@ -576,7 +629,13 @@ function renderRenovate(summary) {
     return;
   }
 
-  elements.renovateList.replaceChildren(...summary.pullRequests.map((pullRequest) => {
+  if (filteredPullRequests.length === 0) {
+    elements.renovateList.innerHTML = `<p class="empty-state">No Renovate pull requests match these filters.</p>`;
+    updateRefreshRenovateButton();
+    return;
+  }
+
+  elements.renovateList.replaceChildren(...filteredPullRequests.map((pullRequest) => {
     const card = document.createElement("article");
     card.className = "renovate-card";
     card.innerHTML = `
@@ -589,6 +648,19 @@ function renderRenovate(summary) {
     return card;
   }));
   updateRefreshRenovateButton();
+}
+
+function filterRenovatePullRequests(pullRequests) {
+  const mergeType = elements.renovateMergeFilter.value;
+  const query = elements.renovateTextFilter.value.trim().toLowerCase();
+
+  return pullRequests.filter((pullRequest) => {
+    const matchesMergeType = mergeType === "all" || (mergeType === "actionable" ? pullRequest.classification !== "auto" : pullRequest.classification === mergeType);
+    const searchable = [pullRequest.title, pullRequest.repository, pullRequest.classification, String(pullRequest.number)].join("\n").toLowerCase();
+    const matchesQuery = !query || searchable.includes(query);
+
+    return matchesMergeType && matchesQuery;
+  });
 }
 
 function applySettings() {

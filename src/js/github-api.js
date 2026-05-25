@@ -342,12 +342,12 @@ export class GitHubClient {
   }
 
   async hydratePullRequestIssue(pullRequest, options = {}) {
-    if (pullRequest.body) {
-      return pullRequest;
-    }
+    const [issue, comments] = await Promise.all([
+      pullRequest.body ? Promise.resolve(null) : this.json(`${pullRequest.repository_url}/issues/${pullRequest.number}`, options),
+      this.paginate(`${pullRequest.repository_url}/issues/${pullRequest.number}/comments?per_page=100`, options)
+    ]);
 
-    const issue = await this.json(`${pullRequest.repository_url}/issues/${pullRequest.number}`, options);
-    return issue ? { ...pullRequest, ...issue } : pullRequest;
+    return { ...pullRequest, ...(issue ?? {}), comments };
   }
 
   captureRateLimit(response) {

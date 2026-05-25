@@ -124,6 +124,16 @@
             </select>
           </label>
           <label>
+            Last push
+            <select id="repo-push-filter">
+              <option value="all">Any time</option>
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+              <option value="older">Older than this month</option>
+            </select>
+          </label>
+          <label>
             Search
             <input id="repo-text-filter" type="search" placeholder="Repository or check" />
           </label>
@@ -156,6 +166,23 @@
             <p id="renovate-summary">No Renovate scan yet.</p>
           </div>
           <button id="refresh-renovate-button" class="ghost-action" type="button" disabled>Refresh PRs</button>
+        </div>
+        <div class="renovate-filter-strip" aria-label="Renovate pull request filters">
+          <label>
+            Merge type
+            <select id="renovate-merge-filter">
+              <option value="actionable">Needs action</option>
+              <option value="all">All PRs</option>
+              <option value="auto">Auto-merge</option>
+              <option value="manual">Manual</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+          <label>
+            Search
+            <input id="renovate-text-filter" type="search" placeholder="Repository or PR" />
+          </label>
+          <button id="clear-renovate-filters" class="ghost-action" type="button">Clear filters</button>
         </div>
         <div id="renovate-list" class="renovate-list">
           <p class="empty-state">Open Renovate pull requests will appear after a scan.</p>

@@ -10,7 +10,8 @@ export function classifyRenovatePullRequest(pullRequest, signals = renovateMerge
   const body = pullRequest.body ?? "";
   const title = pullRequest.title ?? "";
   const labels = (pullRequest.labels ?? []).map((label) => label.name ?? label).join("\n");
-  const text = `${title}\n${body}\n${labels}`;
+  const comments = (pullRequest.comments ?? []).map((comment) => comment.body ?? "").join("\n");
+  const text = `${title}\n${body}\n${labels}\n${comments}`;
 
   if (signals.manualMerge.some((pattern) => pattern.test(text))) {
     return "manual";
