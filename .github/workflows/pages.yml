@@ -24,7 +24,7 @@ permissions:
 jobs:
   pages:
     # renovate: datasource=github-tags depName=DevSecNinja/.github
-    uses: DevSecNinja/.github/.github/workflows/pages.yml@a8f6fb55948a23ca75c427a46dc00787b4bd5d70 # main
+    uses: DevSecNinja/.github/.github/workflows/pages.yml@827f77131e6a52e247ed5e33234eee538ff31b17 # main
     permissions:
       contents: read
       deployments: write

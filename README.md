@@ -84,7 +84,7 @@ Required repository secrets for Cloudflare deployment:
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
 
-The Cloudflare token needs permission to deploy Cloudflare Pages for the account.
+The Cloudflare token needs permission to create and deploy Cloudflare Pages projects for the account. The workflow creates the `github-compliance` Pages project if it does not already exist and deploys `main` as the production branch. If either Cloudflare secret is missing, the production deploy fails clearly instead of silently skipping.
 
 ## Security Notes
 
