@@ -502,6 +502,42 @@ th {
   background: rgba(255, 122, 89, 0.16);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pass {
+    color: #7be3c4;
+    background: rgba(37, 189, 155, 0.18);
+  }
+
+  :root:not([data-theme="light"]) .warn,
+  :root:not([data-theme="light"]) .unknown,
+  :root:not([data-theme="light"]) .info {
+    color: #f5cd71;
+    background: rgba(239, 183, 71, 0.18);
+  }
+
+  :root:not([data-theme="light"]) .fail {
+    color: #ffb1a5;
+    background: rgba(255, 122, 89, 0.2);
+  }
+}
+
+:root[data-theme="dark"] .pass {
+  color: #7be3c4;
+  background: rgba(37, 189, 155, 0.18);
+}
+
+:root[data-theme="dark"] .warn,
+:root[data-theme="dark"] .unknown,
+:root[data-theme="dark"] .info {
+  color: #f5cd71;
+  background: rgba(239, 183, 71, 0.18);
+}
+
+:root[data-theme="dark"] .fail {
+  color: #ffb1a5;
+  background: rgba(255, 122, 89, 0.2);
+}
+
 .empty-state {
   padding: 2rem;
   color: var(--muted);

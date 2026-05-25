@@ -1,4 +1,5 @@
 import { DeviceFlowAuth, canRefresh, tokenIsFresh } from "./auth-device-flow.js";
+import { relativeTime } from "./compliance.js";
 import { appConfig } from "./config.js";
 import { GitHubClient } from "./github-api.js";
 import { clearAuthState, loadAuthState, loadScanSnapshot, loadSettings, saveAuthState, saveScanSnapshot, saveSettings } from "./storage.js";
@@ -31,6 +32,7 @@ const elements = {
   repoStatusFilter: document.querySelector("#repo-status-filter"),
   repoCheckFilter: document.querySelector("#repo-check-filter"),
   repoPushFilter: document.querySelector("#repo-push-filter"),
+  repoVisibilityFilter: document.querySelector("#repo-visibility-filter"),
   repoTextFilter: document.querySelector("#repo-text-filter"),
   clearRepoFilters: document.querySelector("#clear-repo-filters"),
   tabs: [...document.querySelectorAll(".tab-button")],
@@ -122,11 +124,13 @@ function bindEvents() {
   elements.repoStatusFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoCheckFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoPushFilter.addEventListener("change", () => renderCurrentScan());
+  elements.repoVisibilityFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoTextFilter.addEventListener("input", () => renderCurrentScan());
   elements.clearRepoFilters.addEventListener("click", () => {
     elements.repoStatusFilter.value = "all";
     elements.repoCheckFilter.value = "all";
     elements.repoPushFilter.value = "all";
+    elements.repoVisibilityFilter.value = "all";
     elements.repoTextFilter.value = "";
     renderCurrentScan();
   });
@@ -504,6 +508,7 @@ function filterRepositories(repositories) {
   const status = elements.repoStatusFilter.value;
   const check = elements.repoCheckFilter.value;
   const lastPush = elements.repoPushFilter.value;
+  const visibility = elements.repoVisibilityFilter.value;
   const query = elements.repoTextFilter.value.trim().toLowerCase();
 
   return repositories.filter((repo) => {
@@ -511,10 +516,11 @@ function filterRepositories(repositories) {
     const matchesStatus = status === "all" || repo.status === status;
     const matchesCheck = check === "all" || checks.some((item) => item.label === check);
     const matchesLastPush = lastPush === "all" || pushBucket(repo.pushedAt) === lastPush;
-    const searchable = [repo.name, repo.fullName, repo.description, repo.pushedLabel, statusText(repo.status), ...checks.map((item) => item.label)].join("\n").toLowerCase();
+    const matchesVisibility = visibility === "all" || (visibility === "private" ? Boolean(repo.private) : !repo.private);
+    const searchable = [repo.name, repo.fullName, repo.description, relativeTime(repo.pushedAt), statusText(repo.status), ...checks.map((item) => item.label)].join("\n").toLowerCase();
     const matchesQuery = !query || searchable.includes(query);
 
-    return matchesStatus && matchesCheck && matchesLastPush && matchesQuery;
+    return matchesStatus && matchesCheck && matchesLastPush && matchesVisibility && matchesQuery;
   });
 }
 
@@ -530,7 +536,7 @@ function updateCheckFilterOptions(repositories) {
 }
 
 function getRepositoryCheckItems(repo) {
-  return [...(repo.checks ?? []), ...(repo.observations ?? []).filter((item) => item.id !== "last-push")];
+  return [...(repo.checks ?? []), ...(repo.observations ?? []).filter((item) => item.id !== "last-push" && item.id !== "issues")];
 }
 
 function pushBucket(value, now = new Date()) {
@@ -594,20 +600,24 @@ function renderRepositoryRow(repo) {
       <span class="meta-text">${repo.private ? "Private" : "Public"}${repo.archived ? " · Archived" : ""}</span>
     </td>
     <td>${escapeHtml(repo.description)}</td>
-    <td>${escapeHtml(repo.pushedLabel)}</td>
+    <td>${escapeHtml(relativeTime(repo.pushedAt))}</td>
     <td><span class="status-pill ${repo.status}">${statusText(repo.status)}</span></td>
     <td><div class="check-list"></div></td>
   `;
 
   const checks = [...repo.checks, ...repo.observations];
-  row.querySelector(".check-list").replaceChildren(...checks.map(renderCheck));
+  row.querySelector(".check-list").replaceChildren(...checks.map((check) => renderCheck(check, repo)));
   return row;
 }
 
-function renderCheck(check) {
+function renderCheck(check, repo) {
   const item = document.createElement("span");
   item.className = `check-pill ${check.status}`;
-  item.textContent = check.label;
+  if (check.id === "last-push" && repo?.pushedAt) {
+    item.textContent = `Last push ${relativeTime(repo.pushedAt)}`;
+  } else {
+    item.textContent = check.label;
+  }
   return item;
 }
 
