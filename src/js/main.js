@@ -33,6 +33,8 @@ const elements = {
   repoPushFilter: document.querySelector("#repo-push-filter"),
   repoTextFilter: document.querySelector("#repo-text-filter"),
   clearRepoFilters: document.querySelector("#clear-repo-filters"),
+  tabs: [...document.querySelectorAll(".tab-button")],
+  panels: [...document.querySelectorAll(".tab-panel")],
   renovateSummary: document.querySelector("#renovate-summary"),
   renovateList: document.querySelector("#renovate-list"),
   renovateMergeFilter: document.querySelector("#renovate-merge-filter"),
@@ -107,6 +109,9 @@ function bindEvents() {
   elements.scanButton.addEventListener("click", scan);
   elements.advancedScanButton.addEventListener("click", advancedScan);
   elements.refreshRenovateButton.addEventListener("click", refreshRenovatePullRequests);
+  elements.tabs.forEach((tab) => {
+    tab.addEventListener("click", () => selectTab(tab.dataset.tab));
+  });
   elements.renovateMergeFilter.addEventListener("change", () => renderCurrentRenovate());
   elements.renovateTextFilter.addEventListener("input", () => renderCurrentRenovate());
   elements.clearRenovateFilters.addEventListener("click", () => {
@@ -230,6 +235,7 @@ async function scan() {
   }
 
   const owner = elements.scanOwner.value.trim() || appConfig.defaultOwner;
+  selectTab("repositories");
   settings = { ...settings, owner };
   saveSettings(settings);
   startActiveScan("fast");
@@ -307,6 +313,7 @@ async function advancedScan() {
     return;
   }
 
+  selectTab("repositories");
   startActiveScan("advanced");
   elements.progress.textContent = "Running advanced scan...";
 
@@ -679,6 +686,17 @@ function showAuth() {
 function renderArchivedToggle() {
   elements.includeArchived.setAttribute("aria-pressed", String(settings.includeArchived));
   elements.includeArchived.textContent = settings.includeArchived ? "Archived included" : "Include archived";
+}
+
+function selectTab(name) {
+  elements.tabs.forEach((tab) => {
+    const selected = tab.dataset.tab === name;
+    tab.setAttribute("aria-selected", String(selected));
+  });
+
+  elements.panels.forEach((panel) => {
+    panel.hidden = panel.id !== `${name}-panel`;
+  });
 }
 
 function renderRateLimit(rateLimit) {

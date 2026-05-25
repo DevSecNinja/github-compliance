@@ -370,6 +370,32 @@ h2 {
   margin: 0.6rem 0 0;
 }
 
+.tab-shell {
+  display: grid;
+  gap: 0;
+}
+
+.tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.25rem 0 0.75rem;
+}
+
+.tab-button {
+  cursor: pointer;
+  padding: 0.68rem 0.95rem;
+  color: var(--text);
+  font-weight: 800;
+  background: var(--surface-strong);
+}
+
+.tab-button[aria-selected="true"] {
+  border-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--mint));
+}
+
 .table-section {
   overflow: hidden;
 }

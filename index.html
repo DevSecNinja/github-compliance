@@ -102,7 +102,13 @@
         <p>Fast scans avoid expensive ruleset calls. Protection appears as unknown until a deeper ruleset check is added.</p>
       </section>
 
-      <section class="table-section" aria-labelledby="repo-table-title">
+      <section class="tab-shell" aria-label="Dashboard views">
+        <div class="tab-list" role="tablist" aria-label="Dashboard views">
+          <button id="repositories-tab" class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="repositories-panel" data-tab="repositories">Repositories</button>
+          <button id="renovate-tab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="renovate-panel" data-tab="renovate">Renovate PRs</button>
+        </div>
+
+        <section id="repositories-panel" class="table-section tab-panel" role="tabpanel" aria-labelledby="repositories-tab">
         <div class="section-heading">
           <h2 id="repo-table-title">Repositories</h2>
           <p id="scan-progress">Ready to scan.</p>
@@ -157,9 +163,9 @@
             </tbody>
           </table>
         </div>
-      </section>
+        </section>
 
-      <section class="table-section" aria-labelledby="renovate-title">
+        <section id="renovate-panel" class="table-section tab-panel" role="tabpanel" aria-labelledby="renovate-tab" hidden>
         <div class="section-heading">
           <div>
             <h2 id="renovate-title">Renovate pull requests</h2>
@@ -187,6 +193,7 @@
         <div id="renovate-list" class="renovate-list">
           <p class="empty-state">Open Renovate pull requests will appear after a scan.</p>
         </div>
+        </section>
       </section>
     </main>
 
