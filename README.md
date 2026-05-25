@@ -70,7 +70,15 @@ The build script writes `public/build-meta.json` and generates `public/sw.js` fr
 
 The GitHub Pages workflow runs on pull requests and every commit to `main`. Pull requests run tests and build. Pushes to `main` also deploy `dist` to GitHub Pages.
 
+<<<<<<< Updated upstream
 GitHub Pages is static, so production sign-in needs a tiny auth broker for the two device-flow token endpoints. Set a repository or environment variable named `VITE_GITHUB_AUTH_BROKER_URL` before the Pages build so Vite can embed the broker origin. The broker must expose:
+||||||| Stash base
+GitHub Pages is static, so production sign-in needs a tiny auth broker for the two device-flow token endpoints. Set `VITE_GITHUB_AUTH_BROKER_URL` during the Pages build to the broker origin. The broker must expose:
+=======
+This repository uses the central `DevSecNinja/.github` reusable Pages workflow, lint workflow, config-sync workflow, Renovate presets, and config files. Reusable workflow refs are pinned to a release SHA and annotated for Renovate updates.
+
+GitHub Pages is static, so production sign-in needs a tiny auth broker for the two device-flow token endpoints. Set `VITE_GITHUB_AUTH_BROKER_URL` during the Pages build to the broker origin. The broker must expose:
+>>>>>>> Stashed changes
 
 - `POST /github-auth/device-code` -> `https://github.com/login/device/code`
 - `POST /github-auth/access-token` -> `https://github.com/login/oauth/access_token`

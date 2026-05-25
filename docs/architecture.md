@@ -85,3 +85,16 @@ Report-only observations:
 - Unit tests cover pure compliance and Renovate PR parsing.
 - Integration tests mock GitHub device-flow and REST endpoints in Playwright.
 - Accessibility tests inject axe-core into the app and fail on serious or critical issues.
+
+## Shared DevSecNinja Automation
+
+This repository consumes central automation from `DevSecNinja/.github`:
+
+- Reusable Pages workflow for PR validation and GitHub Pages deployment.
+- Reusable lint workflow for shared repository hygiene checks.
+- Reusable config-sync workflow for central config drift PRs.
+- Shared Renovate presets through `renovate.json5`.
+- Shared labeler config and formatter/linter config files.
+- Local CODEOWNERS for repository-specific review ownership.
+
+Reusable workflow refs are pinned to release SHAs and include Renovate comments so updates arrive as normal dependency PRs.

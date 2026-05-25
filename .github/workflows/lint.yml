@@ -1,0 +1,31 @@
+---
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    # renovate: datasource=github-tags depName=DevSecNinja/.github
+    uses: DevSecNinja/.github/.github/workflows/lint.yml@998ff283c3a431bbcb74421180121826cca8fdd7 # v1.4.0
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      # renovate: datasource=github-releases depName=jdx/mise
+      mise-version: "2026.5.0"
+      # renovate: datasource=github-releases depName=golangci/golangci-lint
+      golangci-lint-version: "v2.12.1"
+      lint-fail-on-error: false
+      lint-go: false
+      lint-shellcheck: false
+      lint-shfmt: false
+      lint-checkov: false
+      lint-trivy: false
+      lint-config-drift: true
