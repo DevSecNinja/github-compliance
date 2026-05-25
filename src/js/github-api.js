@@ -15,12 +15,13 @@ export class GitHubClient {
     const url = path.startsWith("http") ? path : `${apiBase}${path}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), appConfig.requestTimeoutMs);
+    const signal = combineSignals(options.signal, controller.signal);
     let response;
 
     try {
       response = await this.fetcher(url, {
         ...options,
-        signal: options.signal ?? controller.signal,
+        signal,
         headers: {
           Accept: "application/vnd.github+json",
           Authorization: `Bearer ${this.token}`,
@@ -30,6 +31,10 @@ export class GitHubClient {
       });
     } catch (error) {
       if (error?.name === "AbortError") {
+        if (options.signal?.aborted) {
+          throw abortError();
+        }
+
         throw new Error(`GitHub request timed out after ${Math.round(appConfig.requestTimeoutMs / 1000)} seconds: ${new URL(url).pathname}`);
       }
 
@@ -65,12 +70,13 @@ export class GitHubClient {
     return response ? response.json() : null;
   }
 
-  async paginate(path) {
+  async paginate(path, options = {}) {
     const items = [];
     let next = path;
 
     while (next) {
-      const response = await this.request(next);
+      throwIfAborted(options.signal);
+      const response = await this.request(next, options);
       if (!response) {
         break;
       }
@@ -82,12 +88,13 @@ export class GitHubClient {
     return items;
   }
 
-  async paginateCollection(path, key) {
+  async paginateCollection(path, key, options = {}) {
     const items = [];
     let next = path;
 
     while (next) {
-      const response = await this.request(next);
+      throwIfAborted(options.signal);
+      const response = await this.request(next, options);
       if (!response) {
         break;
       }
@@ -118,8 +125,8 @@ export class GitHubClient {
     return installations.map((installation) => installation.account?.login).filter(Boolean).sort((left, right) => left.localeCompare(right));
   }
 
-  async requireInstallationForOwner(owner) {
-    const installations = await this.listInstallations();
+  async requireInstallationForOwner(owner, options = {}) {
+    const installations = await this.paginateCollection("/user/installations?per_page=100", "installations", options);
     const installation = await this.getInstallationForOwner(owner, installations);
 
     if (!installation) {
@@ -136,9 +143,9 @@ export class GitHubClient {
     return (includeArchived ? repositories : repositories.filter((repo) => !repo.archived)).sort((left, right) => new Date(right.pushed_at ?? 0) - new Date(left.pushed_at ?? 0));
   }
 
-  async getInstallationRepositoryInventory({ owner, includeArchived }) {
-    const installation = await this.requireInstallationForOwner(owner);
-    const allRepositories = await this.paginateCollection(`/user/installations/${installation.id}/repositories?per_page=100`, "repositories");
+  async getInstallationRepositoryInventory({ owner, includeArchived, signal }) {
+    const installation = await this.requireInstallationForOwner(owner, { signal });
+    const allRepositories = await this.paginateCollection(`/user/installations/${installation.id}/repositories?per_page=100`, "repositories", { signal });
     const repositories = includeArchived ? allRepositories : allRepositories.filter((repo) => !repo.archived);
 
     return {
@@ -149,8 +156,8 @@ export class GitHubClient {
     };
   }
 
-  async scanRepositories({ owner, includeArchived, onProgress, onRepositoryResult }) {
-    const inventory = await this.getInstallationRepositoryInventory({ owner, includeArchived });
+  async scanRepositories({ owner, includeArchived, signal, onProgress, onRepositoryResult }) {
+    const inventory = await this.getInstallationRepositoryInventory({ owner, includeArchived, signal });
     const repositories = inventory.repositories;
     let completed = 0;
     let rateLimitError = null;
@@ -158,6 +165,8 @@ export class GitHubClient {
     onProgress?.({ completed, total: repositories.length, repo: null, inventory });
 
     const results = await mapLimit(repositories, appConfig.scanConcurrency, async (repo) => {
+      throwIfAborted(signal);
+
       if (rateLimitError) {
         return buildSkippedRepository(repo, rateLimitError);
       }
@@ -165,7 +174,7 @@ export class GitHubClient {
       let result;
 
       try {
-        result = await this.scanRepository(repo);
+        result = await this.scanRepository(repo, { signal });
       } catch (error) {
         if (error.isRateLimit) {
           rateLimitError = error;
@@ -181,7 +190,8 @@ export class GitHubClient {
       return result;
     });
 
-    const renovatePullRequests = await this.getRenovatePullRequestsSafely(owner, repositories);
+    throwIfAborted(signal);
+    const renovatePullRequests = await this.getRenovatePullRequestsSafely(owner, repositories, { signal });
 
     return {
       owner,
@@ -199,9 +209,9 @@ export class GitHubClient {
     };
   }
 
-  async getRenovatePullRequestsSafely(owner, repositories) {
+  async getRenovatePullRequestsSafely(owner, repositories, options = {}) {
     try {
-      return await this.getRenovatePullRequests(owner, repositories);
+      return await this.getRenovatePullRequests(owner, repositories, options);
     } catch (error) {
       return {
         total: 0,
@@ -214,24 +224,26 @@ export class GitHubClient {
     }
   }
 
-  async scanRepository(repo) {
-    const files = await this.getComplianceFiles(repo);
+  async scanRepository(repo, options = {}) {
+    const files = await this.getComplianceFiles(repo, options);
 
     return evaluateRepository({ repo, files, rulesets: null, issueCount: null });
   }
 
-  async advancedScanRepositories({ repositories, onProgress, onRepositoryResult }) {
+  async advancedScanRepositories({ repositories, signal, onProgress, onRepositoryResult }) {
     let completed = 0;
     let rateLimitError = null;
 
     const results = await mapLimit(repositories, appConfig.scanConcurrency, async (repository) => {
+      throwIfAborted(signal);
+
       let result;
 
       if (rateLimitError) {
         result = markAdvancedSkipped(repository, rateLimitError);
       } else {
         try {
-          result = await this.advancedScanRepository(repository);
+          result = await this.advancedScanRepository(repository, { signal });
         } catch (error) {
           if (error.isRateLimit) {
             rateLimitError = error;
@@ -255,24 +267,24 @@ export class GitHubClient {
     };
   }
 
-  async advancedScanRepository(repository) {
+  async advancedScanRepository(repository, options = {}) {
     const [owner, repo] = repository.fullName.split("/");
     const [rulesets, issueCount] = await Promise.all([
-      this.getRulesets(owner, repo),
-      this.getOpenIssueCount(owner, repo)
+      this.getRulesets(owner, repo, options),
+      this.getOpenIssueCount(owner, repo, options)
     ]);
 
     return applyAdvancedChecks(repository, { rulesets, issueCount });
   }
 
-  async getComplianceFiles(repo) {
+  async getComplianceFiles(repo, options = {}) {
     const owner = repo.owner.login;
     const name = repo.name;
     const ref = repo.default_branch;
-    const tree = await this.getRepositoryTree(owner, name, ref);
+    const tree = await this.getRepositoryTree(owner, name, ref, options);
     const paths = new Set(tree.map((item) => item.path));
     const renovatePath = findFirstPath(paths, ["renovate.json5", "renovate.json", ".github/renovate.json5", ".github/renovate.json"]);
-    const renovate = renovatePath ? await this.getFirstFile(owner, name, [renovatePath], ref) : null;
+    const renovate = renovatePath ? await this.getFirstFile(owner, name, [renovatePath], ref, options) : null;
 
     return {
       codeowners: findFirstPath(paths, ["CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"]),
@@ -283,14 +295,15 @@ export class GitHubClient {
     };
   }
 
-  async getRepositoryTree(owner, repo, ref) {
-    const result = await this.json(`/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`);
+  async getRepositoryTree(owner, repo, ref, options = {}) {
+    const result = await this.json(`/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`, options);
     return result?.tree ?? [];
   }
 
-  async getFirstFile(owner, repo, paths, ref) {
+  async getFirstFile(owner, repo, paths, ref, options = {}) {
     for (const path of paths) {
-      const file = await this.getContent(owner, repo, path, ref);
+      throwIfAborted(options.signal);
+      const file = await this.getContent(owner, repo, path, ref, options);
       if (file?.type === "file") {
         return { path, content: decodeContent(file.content) };
       }
@@ -304,36 +317,36 @@ export class GitHubClient {
     return Array.isArray(content) && content.length > 0 ? content : null;
   }
 
-  getContent(owner, repo, path, ref) {
+  getContent(owner, repo, path, ref, options = {}) {
     const query = ref ? `?ref=${encodeURIComponent(ref)}` : "";
-    return this.json(`/repos/${owner}/${repo}/contents/${encodePath(path)}${query}`);
+    return this.json(`/repos/${owner}/${repo}/contents/${encodePath(path)}${query}`, options);
   }
 
-  async getRulesets(owner, repo) {
-    return (await this.json(`/repos/${owner}/${repo}/rulesets?targets=branch&per_page=100`)) ?? [];
+  async getRulesets(owner, repo, options = {}) {
+    return (await this.json(`/repos/${owner}/${repo}/rulesets?targets=branch&per_page=100`, options)) ?? [];
   }
 
-  async getOpenIssueCount(owner, repo) {
+  async getOpenIssueCount(owner, repo, options = {}) {
     const query = encodeURIComponent(`repo:${owner}/${repo} is:issue is:open`);
-    const result = await this.json(`/search/issues?q=${query}&per_page=1`);
+    const result = await this.json(`/search/issues?q=${query}&per_page=1`, options);
     return result?.total_count ?? null;
   }
 
-  async getRenovatePullRequests(owner, repositories) {
+  async getRenovatePullRequests(owner, repositories, options = {}) {
     const query = encodeURIComponent(`org:${owner} is:pr is:open author:renovate[bot]`);
-    const result = await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items");
+    const result = await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items", options);
     const allowedRepositories = new Set(repositories.map((repo) => repo.full_name ?? repo.fullName));
     const pullRequests = result.filter((item) => item.pull_request && allowedRepositories.has(repositoryFromApiUrl(item.repository_url)));
-    const hydratedPullRequests = await mapLimit(pullRequests, 2, (pullRequest) => this.hydratePullRequestIssue(pullRequest));
+    const hydratedPullRequests = await mapLimit(pullRequests, 2, (pullRequest) => this.hydratePullRequestIssue(pullRequest, options), options.signal);
     return summarizeRenovatePullRequests(hydratedPullRequests);
   }
 
-  async hydratePullRequestIssue(pullRequest) {
+  async hydratePullRequestIssue(pullRequest, options = {}) {
     if (pullRequest.body) {
       return pullRequest;
     }
 
-    const issue = await this.json(`${pullRequest.repository_url}/issues/${pullRequest.number}`);
+    const issue = await this.json(`${pullRequest.repository_url}/issues/${pullRequest.number}`, options);
     return issue ? { ...pullRequest, ...issue } : pullRequest;
   }
 
@@ -378,11 +391,12 @@ function getNextLink(linkHeader) {
   return next ? next.match(/<([^>]+)>/)?.[1] ?? null : null;
 }
 
-async function mapLimit(items, limit, iteratee) {
+async function mapLimit(items, limit, iteratee, signal) {
   const results = [];
   const executing = new Set();
 
   for (const item of items) {
+    throwIfAborted(signal);
     const promise = Promise.resolve().then(() => iteratee(item));
     results.push(promise);
     executing.add(promise);
@@ -394,6 +408,32 @@ async function mapLimit(items, limit, iteratee) {
   }
 
   return Promise.all(results);
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw abortError();
+  }
+}
+
+function combineSignals(externalSignal, timeoutSignal) {
+  if (!externalSignal) {
+    return timeoutSignal;
+  }
+
+  if (externalSignal.aborted) {
+    return externalSignal;
+  }
+
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  externalSignal.addEventListener("abort", abort, { once: true });
+  timeoutSignal.addEventListener("abort", abort, { once: true });
+  return controller.signal;
+}
+
+function abortError() {
+  return new DOMException("Scan paused.", "AbortError");
 }
 
 function buildFailedRepository(repo, error) {

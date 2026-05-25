@@ -83,7 +83,21 @@ test("stops new repository requests when rate limit is reached", async ({ page }
   await expect(page.getByText(/Skipped because GitHub rate limit was reached/i)).toBeVisible();
 });
 
-async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo } = {}) {
+test("pauses a running fast scan", async ({ page }) => {
+  await mockGitHub(page, { delayTree: true });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+  await page.getByRole("button", { name: "Scan repositories" }).click();
+
+  await expect(page.getByRole("button", { name: "Pause scan" })).toBeVisible();
+  await page.getByRole("button", { name: "Pause scan" }).click();
+
+  await expect(page.getByText(/Fast scan paused/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Scan repositories" })).toBeVisible();
+});
+
+async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo, delayTree = false } = {}) {
   const encodedRenovate = btoa('extends: ["github>DevSecNinja/.github//.renovate/base.json5"]');
   const encodedReadme = btoa("# Travel Prep");
   const encodedLicense = btoa("MIT");
@@ -153,6 +167,10 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
     }
 
     if (path.endsWith("/git/trees/main")) {
+      if (delayTree) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
       await route.fulfill({ json: { tree: tree() } });
       return;
     }

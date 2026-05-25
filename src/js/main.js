@@ -46,6 +46,8 @@ let client;
 let viewer;
 const rateLimitBuckets = new Map();
 let currentScanResult;
+let activeScanController;
+let activeScanKind;
 
 bootstrap();
 
@@ -191,6 +193,11 @@ async function renderInstallationHint(owner) {
 }
 
 async function scan() {
+  if (activeScanKind === "fast") {
+    pauseActiveScan("Fast scan paused.");
+    return;
+  }
+
   if (!client) {
     showAuth();
     return;
@@ -199,8 +206,7 @@ async function scan() {
   const owner = elements.scanOwner.value.trim() || appConfig.defaultOwner;
   settings = { ...settings, owner };
   saveSettings(settings);
-  elements.scanButton.disabled = true;
-  elements.advancedScanButton.disabled = true;
+  startActiveScan("fast");
   elements.progress.textContent = "Scanning repositories...";
   currentScanResult = null;
   renderScan({ owner, includeArchived: settings.includeArchived, scannedAt: new Date().toISOString(), repositories: [], renovate: null });
@@ -209,6 +215,7 @@ async function scan() {
     const result = await client.scanRepositories({
       owner,
       includeArchived: settings.includeArchived,
+      signal: activeScanController.signal,
       onProgress: ({ completed, total, repo, inventory }) => {
         if (inventory) {
           currentScanResult = {
@@ -246,6 +253,11 @@ async function scan() {
     await saveScanSnapshot(owner, result);
     renderScan(result);
   } catch (error) {
+    if (error?.name === "AbortError") {
+      await savePartialScan(owner, "Fast scan paused. Showing partial results.");
+      return;
+    }
+
     const cached = await loadScanSnapshot(owner);
     if (cached) {
       renderScan(cached, { cached: true });
@@ -254,23 +266,28 @@ async function scan() {
       elements.progress.textContent = cleanError(error);
     }
   } finally {
-    elements.scanButton.disabled = false;
+    stopActiveScan("fast");
     updateAdvancedScanButton();
   }
 }
 
 async function advancedScan() {
+  if (activeScanKind === "advanced") {
+    pauseActiveScan("Advanced scan paused.");
+    return;
+  }
+
   if (!client || !currentScanResult?.repositories?.length) {
     return;
   }
 
-  elements.scanButton.disabled = true;
-  elements.advancedScanButton.disabled = true;
+  startActiveScan("advanced");
   elements.progress.textContent = "Running advanced scan...";
 
   try {
     const result = await client.advancedScanRepositories({
       repositories: currentScanResult.repositories,
+      signal: activeScanController.signal,
       onProgress: ({ completed, total, repo }) => {
         elements.progress.textContent = `Advanced scanned ${completed} of ${total}: ${repo}`;
       },
@@ -299,11 +316,63 @@ async function advancedScan() {
     await saveScanSnapshot(currentScanResult.owner, currentScanResult);
     renderScan(currentScanResult);
   } catch (error) {
+    if (error?.name === "AbortError") {
+      await savePartialScan(currentScanResult.owner, "Advanced scan paused. Showing partial results.");
+      return;
+    }
+
     elements.progress.textContent = cleanError(error);
   } finally {
-    elements.scanButton.disabled = false;
+    stopActiveScan("advanced");
     updateAdvancedScanButton();
   }
+}
+
+async function savePartialScan(owner, message) {
+  if (currentScanResult?.repositories?.length) {
+    currentScanResult.scannedAt = new Date().toISOString();
+    await saveScanSnapshot(owner, currentScanResult);
+    renderScan(currentScanResult);
+  }
+
+  elements.progress.textContent = message;
+}
+
+function startActiveScan(kind) {
+  activeScanController = new AbortController();
+  activeScanKind = kind;
+
+  if (kind === "fast") {
+    elements.scanButton.disabled = false;
+    elements.scanButton.textContent = "Pause scan";
+    elements.advancedScanButton.disabled = true;
+  } else {
+    elements.scanButton.disabled = true;
+    elements.advancedScanButton.disabled = false;
+    elements.advancedScanButton.textContent = "Pause advanced";
+  }
+
+  elements.includeArchived.disabled = true;
+  elements.refreshRenovateButton.disabled = true;
+}
+
+function stopActiveScan(kind) {
+  if (activeScanKind !== kind) {
+    return;
+  }
+
+  activeScanController = undefined;
+  activeScanKind = undefined;
+  elements.scanButton.disabled = false;
+  elements.scanButton.textContent = "Scan repositories";
+  elements.advancedScanButton.textContent = "Advanced scan";
+  elements.includeArchived.disabled = false;
+  updateRefreshRenovateButton();
+}
+
+function pauseActiveScan(message) {
+  activeScanController?.abort();
+  elements.progress.textContent = message;
 }
 
 function renderScan(result, { cached = false } = {}) {
@@ -487,11 +556,16 @@ function renderRateLimit(rateLimit) {
 }
 
 function updateAdvancedScanButton() {
-  elements.advancedScanButton.disabled = !client || !currentScanResult?.repositories?.length || elements.scanButton.disabled;
+  if (activeScanKind === "advanced") {
+    elements.advancedScanButton.disabled = false;
+    return;
+  }
+
+  elements.advancedScanButton.disabled = Boolean(activeScanKind) || !client || !currentScanResult?.repositories?.length;
 }
 
 function updateRefreshRenovateButton() {
-  elements.refreshRenovateButton.disabled = !client || !currentScanResult?.repositories?.length;
+  elements.refreshRenovateButton.disabled = Boolean(activeScanKind) || !client || !currentScanResult?.repositories?.length;
 }
 
 function applyTheme(theme) {
