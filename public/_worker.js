@@ -2,16 +2,10 @@ const githubAuthRoutes = {
   "/github-auth/device-code": "https://github.com/login/device/code",
   "/github-auth/access-token": "https://github.com/login/oauth/access_token"
 };
-const canonicalHost = "gh-compliance.ravensberg.org";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    if (shouldRedirectToCanonicalHost(url)) {
-      url.hostname = canonicalHost;
-      return Response.redirect(url.toString(), 308);
-    }
 
     if (githubAuthRoutes[url.pathname]) {
       return handleGitHubAuth(request, url, githubAuthRoutes[url.pathname]);
@@ -92,12 +86,8 @@ function corsHeaders(request, url) {
 function originIsAllowed(origin, url) {
   try {
     const originUrl = new URL(origin);
-    return originUrl.hostname === url.hostname || originUrl.hostname === canonicalHost || originUrl.hostname.endsWith(".pages.dev");
+    return originUrl.hostname === url.hostname || originUrl.hostname === "gh-compliance.ravensberg.org" || originUrl.hostname.endsWith(".pages.dev");
   } catch {
     return false;
   }
-}
-
-function shouldRedirectToCanonicalHost(url) {
-  return url.hostname.endsWith(".pages.dev") && url.hostname !== canonicalHost;
 }

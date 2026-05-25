@@ -45,13 +45,6 @@ describe("Cloudflare Pages Worker", () => {
     assert.equal(await response.text(), "asset response");
   });
 
-  it("redirects pages.dev hostnames to the canonical domain", async () => {
-    const response = await worker.fetch(new Request("https://2727f13f.github-compliance.pages.dev/path?x=1"), assetEnv());
-
-    assert.equal(response.status, 308);
-    assert.equal(response.headers.get("Location"), "https://gh-compliance.ravensberg.org/path?x=1");
-  });
-
   it("blocks unexpected cross-origin auth calls", async () => {
     const response = await worker.fetch(
       new Request("https://gh-compliance.ravensberg.org/github-auth/device-code", {
