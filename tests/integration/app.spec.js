@@ -8,6 +8,7 @@ test("signs in with device flow, scans repositories, and renders results", async
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
 
   await expect(page.getByText("Signed in as")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Advanced scan" })).toBeDisabled();
   await page.getByRole("button", { name: "Scan repositories" }).click();
 
   await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
@@ -16,6 +17,13 @@ test("signs in with device flow, scans repositories, and renders results", async
   await expect(page.getByText("Found 2 repositories; showing 1, excluding 1 archived.")).toBeVisible();
   await expect(page.getByText("search: 29 of 30 left")).toBeVisible();
   await expect(page.getByText("1 open. 1 auto-merge, 0 manual, 0 unknown.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Update archived dependency" })).toHaveCount(0);
+
+  await expect(page.getByRole("button", { name: "Advanced scan" })).toBeEnabled();
+  await page.getByRole("button", { name: "Advanced scan" }).click();
+
+  await expect(page.getByText("Force pushes and deletion are blocked")).toBeVisible();
+  await expect(page.getByText("2 open issues")).toBeVisible();
 });
 
 test("excludes archived repositories by default and includes them on request", async ({ page }) => {
@@ -166,9 +174,20 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
               id: 100,
               number: 22,
               title: "Update dependency vite",
-              body: "Automerge: enabled",
+              body: null,
               html_url: "https://github.com/DevSecNinja/travel-prep/pull/22",
               repository_url: "https://api.github.com/repos/DevSecNinja/travel-prep",
+              updated_at: "2026-05-24T10:00:00Z",
+              user: { login: "renovate[bot]" },
+              pull_request: {}
+            },
+            {
+              id: 102,
+              number: 23,
+              title: "Update archived dependency",
+              body: "Automerge: enabled",
+              html_url: "https://github.com/DevSecNinja/old-tool/pull/23",
+              repository_url: "https://api.github.com/repos/DevSecNinja/old-tool",
               updated_at: "2026-05-24T10:00:00Z",
               user: { login: "renovate[bot]" },
               pull_request: {}
@@ -187,6 +206,11 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
           ]
         }
       });
+      return;
+    }
+
+    if (path === "/repos/DevSecNinja/travel-prep/issues/22") {
+      await route.fulfill({ json: { body: "🚦 Automerge: Enabled.", labels: [{ name: "merge: auto" }] } });
       return;
     }
 

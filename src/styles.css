@@ -247,7 +247,9 @@ h2 {
   transform: translateY(-1px);
 }
 
-.primary-action:disabled {
+.primary-action:disabled,
+.ghost-action:disabled,
+.toggle-action:disabled {
   cursor: wait;
   opacity: 0.64;
 }
@@ -323,8 +325,13 @@ h2 {
 
 .control-strip {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto auto;
+  align-items: end;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto auto auto;
   padding: 1rem;
+}
+
+.control-strip > div:first-child {
+  align-self: center;
 }
 
 .status-line {

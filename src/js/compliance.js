@@ -1,6 +1,10 @@
 import { appConfig, renovateCentralPatterns } from "./config.js";
 
 export function isLowerHyphenName(name) {
+  if (name === ".github") {
+    return true;
+  }
+
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name);
 }
 
@@ -169,12 +173,53 @@ export function evaluateRepository({ repo, files, rulesets, issueCount, now = ne
   };
 }
 
+export function applyAdvancedChecks(repository, { rulesets, issueCount }) {
+  const protection = evaluateRulesets(rulesets, repository.defaultBranch);
+  const checks = repository.checks.filter((check) => check.id !== "protection");
+
+  if (protection.status !== "unknown") {
+    checks.push(buildCheck("protection", protection.status === "pass", protection.label, protection.label));
+  }
+
+  const observations = repository.observations
+    .filter((observation) => observation.id !== "issues" && observation.id !== "protection" && !observation.id.startsWith("protection-report-"))
+    .concat([
+      {
+        id: "issues",
+        status: issueCount === null || issueCount === undefined ? "unknown" : "info",
+        label: issueCount === null || issueCount === undefined ? "Open issues unknown" : `${issueCount} open issue${issueCount === 1 ? "" : "s"}`
+      },
+      ...protection.report.map((label, index) => ({ id: `protection-report-${index}`, status: "info", label }))
+    ]);
+
+  return {
+    ...repository,
+    issueCount: issueCount ?? null,
+    status: summarizeStatus(checks, observations),
+    checks,
+    observations,
+    protection
+  };
+}
+
 function buildCheck(id, passed, passLabel, failLabel) {
   return {
     id,
     status: passed ? "pass" : "fail",
     label: passed ? passLabel : failLabel
   };
+}
+
+function summarizeStatus(checks, observations) {
+  if (checks.some((check) => check.status === "fail")) {
+    return "fail";
+  }
+
+  if (observations.some((observation) => observation.status === "warn")) {
+    return "warn";
+  }
+
+  return "pass";
 }
 
 function appliesToDefaultBranch(pattern, defaultBranch) {

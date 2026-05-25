@@ -5,6 +5,7 @@ import { evaluateRenovateContent, evaluateRepository, evaluateRulesets, isLowerH
 describe("compliance rules", () => {
   it("accepts lowercase hyphen repository names", () => {
     assert.equal(isLowerHyphenName("travel-prep"), true);
+    assert.equal(isLowerHyphenName(".github"), true);
     assert.equal(isLowerHyphenName("Travel_Prep"), false);
   });
 

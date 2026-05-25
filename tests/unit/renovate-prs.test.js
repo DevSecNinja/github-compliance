@@ -12,6 +12,8 @@ describe("renovate pull request parsing", () => {
 
   it("classifies auto-merge and manual merge from text", () => {
     assert.equal(classifyRenovatePullRequest({ title: "Update vite", body: "Automerge: enabled" }), "auto");
+    assert.equal(classifyRenovatePullRequest({ title: "Update devcontainer", body: "🚦 Automerge: Enabled." }), "auto");
+    assert.equal(classifyRenovatePullRequest({ title: "Update image", body: "", labels: [{ name: "merge: auto" }] }), "auto");
     assert.equal(classifyRenovatePullRequest({ title: "Update node", body: "Requires manual merge" }), "manual");
     assert.equal(classifyRenovatePullRequest({ title: "Update docs", body: "Dependency update" }), "unknown");
   });

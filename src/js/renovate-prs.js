@@ -9,7 +9,8 @@ export function isRenovatePullRequest(pullRequest) {
 export function classifyRenovatePullRequest(pullRequest, signals = renovateMergeSignals) {
   const body = pullRequest.body ?? "";
   const title = pullRequest.title ?? "";
-  const text = `${title}\n${body}`;
+  const labels = (pullRequest.labels ?? []).map((label) => label.name ?? label).join("\n");
+  const text = `${title}\n${body}\n${labels}`;
 
   if (signals.manualMerge.some((pattern) => pattern.test(text))) {
     return "manual";

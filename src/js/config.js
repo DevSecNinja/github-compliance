@@ -20,7 +20,10 @@ export const renovateCentralPatterns = [
 export const renovateMergeSignals = {
   autoMerge: [
     /automerge\s*:\s*enabled/i,
+    /automerge\s+enabled/i,
+    /🚦\s*automerge\s*:\s*enabled/i,
     /auto-?merge\s+enabled/i,
+    /merge:\s*auto/i,
     /this pr will be automerged/i,
     /renovate will automatically merge/i
   ],

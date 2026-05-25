@@ -1,5 +1,5 @@
 import { appConfig } from "./config.js";
-import { evaluateRepository } from "./compliance.js";
+import { applyAdvancedChecks, evaluateRepository } from "./compliance.js";
 import { summarizeRenovatePullRequests } from "./renovate-prs.js";
 
 const apiBase = "https://api.github.com";
@@ -149,7 +149,7 @@ export class GitHubClient {
     };
   }
 
-  async scanRepositories({ owner, includeArchived, onProgress }) {
+  async scanRepositories({ owner, includeArchived, onProgress, onRepositoryResult }) {
     const inventory = await this.getInstallationRepositoryInventory({ owner, includeArchived });
     const repositories = inventory.repositories;
     let completed = 0;
@@ -176,11 +176,12 @@ export class GitHubClient {
       }
 
       completed += 1;
+      onRepositoryResult?.(result, { completed, total: repositories.length });
       onProgress?.({ completed, total: repositories.length, repo: repo.name });
       return result;
     });
 
-    const renovatePullRequests = await this.getRenovatePullRequestsSafely(owner);
+    const renovatePullRequests = await this.getRenovatePullRequestsSafely(owner, repositories);
 
     return {
       owner,
@@ -198,9 +199,9 @@ export class GitHubClient {
     };
   }
 
-  async getRenovatePullRequestsSafely(owner) {
+  async getRenovatePullRequestsSafely(owner, repositories) {
     try {
-      return await this.getRenovatePullRequests(owner);
+      return await this.getRenovatePullRequests(owner, repositories);
     } catch (error) {
       return {
         total: 0,
@@ -217,6 +218,51 @@ export class GitHubClient {
     const files = await this.getComplianceFiles(repo);
 
     return evaluateRepository({ repo, files, rulesets: null, issueCount: null });
+  }
+
+  async advancedScanRepositories({ repositories, onProgress, onRepositoryResult }) {
+    let completed = 0;
+    let rateLimitError = null;
+
+    const results = await mapLimit(repositories, appConfig.scanConcurrency, async (repository) => {
+      let result;
+
+      if (rateLimitError) {
+        result = markAdvancedSkipped(repository, rateLimitError);
+      } else {
+        try {
+          result = await this.advancedScanRepository(repository);
+        } catch (error) {
+          if (error.isRateLimit) {
+            rateLimitError = error;
+            result = markAdvancedSkipped(repository, error);
+          } else {
+            result = markAdvancedFailed(repository, error);
+          }
+        }
+      }
+
+      completed += 1;
+      onRepositoryResult?.(result, { completed, total: repositories.length });
+      onProgress?.({ completed, total: repositories.length, repo: repository.name });
+      return result;
+    });
+
+    return {
+      repositories: results,
+      rateLimited: Boolean(rateLimitError),
+      rateLimitResetAt: rateLimitError?.rateLimit?.reset ?? null
+    };
+  }
+
+  async advancedScanRepository(repository) {
+    const [owner, repo] = repository.fullName.split("/");
+    const [rulesets, issueCount] = await Promise.all([
+      this.getRulesets(owner, repo),
+      this.getOpenIssueCount(owner, repo)
+    ]);
+
+    return applyAdvancedChecks(repository, { rulesets, issueCount });
   }
 
   async getComplianceFiles(repo) {
@@ -273,11 +319,22 @@ export class GitHubClient {
     return result?.total_count ?? null;
   }
 
-  async getRenovatePullRequests(owner) {
+  async getRenovatePullRequests(owner, repositories) {
     const query = encodeURIComponent(`org:${owner} is:pr is:open author:renovate[bot]`);
     const result = await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items");
-    const pullRequests = result.filter((item) => item.pull_request);
-    return summarizeRenovatePullRequests(pullRequests);
+    const allowedRepositories = new Set(repositories.map((repo) => repo.full_name));
+    const pullRequests = result.filter((item) => item.pull_request && allowedRepositories.has(repositoryFromApiUrl(item.repository_url)));
+    const hydratedPullRequests = await mapLimit(pullRequests, 2, (pullRequest) => this.hydratePullRequestIssue(pullRequest));
+    return summarizeRenovatePullRequests(hydratedPullRequests);
+  }
+
+  async hydratePullRequestIssue(pullRequest) {
+    if (pullRequest.body) {
+      return pullRequest;
+    }
+
+    const issue = await this.json(`${pullRequest.repository_url}/issues/${pullRequest.number}`);
+    return issue ? { ...pullRequest, ...issue } : pullRequest;
   }
 
   captureRateLimit(response) {
@@ -306,6 +363,10 @@ function encodePath(path) {
 
 function findFirstPath(paths, candidates) {
   return candidates.find((path) => paths.has(path)) ?? null;
+}
+
+function repositoryFromApiUrl(repositoryUrl) {
+  return repositoryUrl?.split("/repos/")[1] ?? "";
 }
 
 function getNextLink(linkHeader) {
@@ -386,6 +447,34 @@ function buildSkippedRepository(repo, error) {
     ],
     observations: [],
     protection: { status: "unknown", label: "Not checked", missing: [], report: [] }
+  };
+}
+
+function markAdvancedFailed(repository, error) {
+  return addObservation(repository, {
+    id: "advanced-scan",
+    status: "warn",
+    label: `Advanced scan failed: ${cleanError(error)}`
+  });
+}
+
+function markAdvancedSkipped(repository, error) {
+  const resetText = error.rateLimit?.reset ? ` Try again after ${new Date(error.rateLimit.reset).toLocaleTimeString()}.` : " Try again later.";
+
+  return addObservation(repository, {
+    id: "advanced-scan",
+    status: "warn",
+    label: `Advanced scan skipped because GitHub rate limit was reached.${resetText}`
+  });
+}
+
+function addObservation(repository, observation) {
+  const observations = repository.observations.filter((item) => item.id !== observation.id).concat(observation);
+
+  return {
+    ...repository,
+    status: repository.status === "fail" ? "fail" : "warn",
+    observations
   };
 }
 

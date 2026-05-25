@@ -21,6 +21,7 @@ const elements = {
   scanOwner: document.querySelector("#scan-owner"),
   includeArchived: document.querySelector("#include-archived"),
   scanButton: document.querySelector("#scan-button"),
+  advancedScanButton: document.querySelector("#advanced-scan-button"),
   networkStatus: document.querySelector("#network-status"),
   rateLimit: document.querySelector("#rate-limit"),
   lastScan: document.querySelector("#last-scan"),
@@ -43,6 +44,7 @@ let auth = new DeviceFlowAuth();
 let client;
 let viewer;
 const rateLimitBuckets = new Map();
+let currentScanResult;
 
 bootstrap();
 
@@ -92,6 +94,7 @@ function bindEvents() {
   });
 
   elements.scanButton.addEventListener("click", scan);
+  elements.advancedScanButton.addEventListener("click", advancedScan);
 }
 
 async function signIn() {
@@ -160,8 +163,10 @@ async function openApp() {
 
   const cached = await loadScanSnapshot(settings.owner);
   if (cached) {
+    currentScanResult = cached;
     renderScan(cached, { cached: true });
   } else {
+    updateAdvancedScanButton();
     await renderInstallationHint(settings.owner);
   }
 }
@@ -193,7 +198,10 @@ async function scan() {
   settings = { ...settings, owner };
   saveSettings(settings);
   elements.scanButton.disabled = true;
+  elements.advancedScanButton.disabled = true;
   elements.progress.textContent = "Scanning repositories...";
+  currentScanResult = null;
+  renderScan({ owner, includeArchived: settings.includeArchived, scannedAt: new Date().toISOString(), repositories: [], renovate: null });
 
   try {
     const result = await client.scanRepositories({
@@ -201,14 +209,38 @@ async function scan() {
       includeArchived: settings.includeArchived,
       onProgress: ({ completed, total, repo, inventory }) => {
         if (inventory) {
+          currentScanResult = {
+            owner,
+            includeArchived: settings.includeArchived,
+            scannedAt: new Date().toISOString(),
+            inventory: {
+              totalCount: inventory.totalCount,
+              archivedCount: inventory.archivedCount,
+              scannedCount: completed
+            },
+            repositories: [],
+            renovate: null
+          };
+          renderScan(currentScanResult);
           elements.progress.textContent = `Found ${inventory.totalCount} repositories; scanning ${inventory.repositories.length}${settings.includeArchived ? "" : `, excluding ${inventory.archivedCount} archived`}.`;
           return;
         }
 
         elements.progress.textContent = `Scanned ${completed} of ${total}: ${repo}`;
+      },
+      onRepositoryResult: (repository, { completed, total }) => {
+        if (!currentScanResult) {
+          return;
+        }
+
+        currentScanResult.inventory.scannedCount = completed;
+        upsertRepository(currentScanResult, repository);
+        renderScan(currentScanResult);
+        elements.progress.textContent = `Scanned ${completed} of ${total}: ${repository.name}`;
       }
     });
 
+    currentScanResult = result;
     await saveScanSnapshot(owner, result);
     renderScan(result);
   } catch (error) {
@@ -221,6 +253,54 @@ async function scan() {
     }
   } finally {
     elements.scanButton.disabled = false;
+    updateAdvancedScanButton();
+  }
+}
+
+async function advancedScan() {
+  if (!client || !currentScanResult?.repositories?.length) {
+    return;
+  }
+
+  elements.scanButton.disabled = true;
+  elements.advancedScanButton.disabled = true;
+  elements.progress.textContent = "Running advanced scan...";
+
+  try {
+    const result = await client.advancedScanRepositories({
+      repositories: currentScanResult.repositories,
+      onProgress: ({ completed, total, repo }) => {
+        elements.progress.textContent = `Advanced scanned ${completed} of ${total}: ${repo}`;
+      },
+      onRepositoryResult: (repository, { completed, total }) => {
+        upsertRepository(currentScanResult, repository);
+        currentScanResult.inventory = {
+          ...(currentScanResult.inventory ?? {}),
+          advancedScannedCount: completed
+        };
+        currentScanResult.advancedScannedAt = new Date().toISOString();
+        renderScan(currentScanResult);
+        elements.progress.textContent = `Advanced scanned ${completed} of ${total}: ${repository.name}`;
+      }
+    });
+
+    currentScanResult = {
+      ...currentScanResult,
+      repositories: result.repositories,
+      advancedScannedAt: new Date().toISOString(),
+      inventory: {
+        ...(currentScanResult.inventory ?? {}),
+        advancedRateLimited: result.rateLimited,
+        advancedRateLimitResetAt: result.rateLimitResetAt
+      }
+    };
+    await saveScanSnapshot(currentScanResult.owner, currentScanResult);
+    renderScan(currentScanResult);
+  } catch (error) {
+    elements.progress.textContent = cleanError(error);
+  } finally {
+    elements.scanButton.disabled = false;
+    updateAdvancedScanButton();
   }
 }
 
@@ -244,6 +324,18 @@ function renderScan(result, { cached = false } = {}) {
   }
 
   renderRenovate(result.renovate);
+  updateAdvancedScanButton();
+}
+
+function upsertRepository(result, repository) {
+  const index = result.repositories.findIndex((item) => item.id === repository.id);
+
+  if (index === -1) {
+    result.repositories.push(repository);
+    return;
+  }
+
+  result.repositories.splice(index, 1, repository);
 }
 
 function formatScanSummary(result, visibleCount) {
@@ -267,6 +359,10 @@ function formatEmptyRepositoryMessage(result) {
 
   if (result.inventory?.totalCount === 0) {
     return "The GitHub App installation returned zero repositories. Check repository access in the app installation settings.";
+  }
+
+  if (result.inventory?.totalCount > 0 && result.repositories?.length === 0) {
+    return "Waiting for the first repository result...";
   }
 
   return "No repositories found.";
@@ -356,6 +452,10 @@ function renderRateLimit(rateLimit) {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, bucket]) => `${name}: ${bucket.remaining} of ${bucket.limit} left`)
     .join(" · ");
+}
+
+function updateAdvancedScanButton() {
+  elements.advancedScanButton.disabled = !client || !currentScanResult?.repositories?.length || elements.scanButton.disabled;
 }
 
 function applyTheme(theme) {
