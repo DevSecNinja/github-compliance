@@ -378,7 +378,7 @@ async function loadBuildMeta() {
   }
 }
 
-function registerServiceWorker() {
+async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) {
     return;
   }
@@ -391,11 +391,16 @@ function registerServiceWorker() {
     }
   });
 
+  const swVersion = await getServiceWorkerVersion();
+
   window.addEventListener("load", async () => {
-    const registration = await navigator.serviceWorker.register("./sw.js");
+    const registration = await navigator.serviceWorker.register(`./sw.js?v=${encodeURIComponent(swVersion)}`);
     if (registration.waiting) {
       registration.waiting.postMessage({ type: "SKIP_WAITING" });
     }
+
+    await registration.update();
+
     registration.addEventListener("updatefound", () => {
       const worker = registration.installing;
       worker?.addEventListener("statechange", () => {
@@ -405,6 +410,20 @@ function registerServiceWorker() {
       });
     });
   });
+}
+
+async function getServiceWorkerVersion() {
+  try {
+    const response = await fetch("./build-meta.json", { cache: "no-store" });
+    if (response.ok) {
+      const meta = await response.json();
+      return meta.shortSha || meta.sha || Date.now().toString();
+    }
+  } catch {
+    // Fall back to a stable local version when build metadata is unavailable.
+  }
+
+  return "local";
 }
 
 function showError(message) {

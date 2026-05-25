@@ -3,7 +3,20 @@ const cacheName = `github-compliance-${buildVersion}`;
 const appShell = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./offline.html", "./build-meta.json"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(appShell)));
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(cacheName);
+      await Promise.all(
+        appShell.map(async (url) => {
+          const response = await fetch(new Request(url, { cache: "reload" }));
+          if (response.ok) {
+            await cache.put(url, response);
+          }
+        })
+      );
+      await self.skipWaiting();
+    })()
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -29,10 +42,56 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("./offline.html")));
+  const acceptsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+  const isHtml = request.mode === "navigate" || acceptsHtml;
+  const isScript = url.pathname.endsWith(".js");
+  const isBuildMeta = url.pathname.endsWith("/build-meta.json");
+
+  if (isHtml || isScript || isBuildMeta) {
+    event.respondWith(networkFirst(request));
     return;
   }
 
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+  event.respondWith(cacheFirst(request));
 });
+
+async function networkFirst(request) {
+  const cache = await caches.open(cacheName);
+
+  try {
+    const response = await fetch(new Request(request, { cache: "no-cache" }));
+    if (response.ok) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
+
+    if (request.mode === "navigate") {
+      return (await cache.match("./offline.html")) || (await cache.match("./index.html")) || (await cache.match("./"));
+    }
+
+    return new Response("", { status: 503, statusText: "Service Unavailable" });
+  }
+}
+
+async function cacheFirst(request) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const response = await fetch(new Request(request, { cache: "no-cache" }));
+    if (response.ok) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return new Response("", { status: 503, statusText: "Service Unavailable" });
+  }
+}
