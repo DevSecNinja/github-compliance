@@ -2,7 +2,7 @@
 
 ## Overview
 
-GitHub Compliance is a static, local-first PWA. It keeps runtime dependencies at zero and organizes the app into small browser modules.
+GitHub Compliance is a static, local-first PWA. It keeps runtime dependencies minimal and organizes the app into small browser modules.
 
 - `index.html` defines the authenticated app shell.
 - `src/js/main.js` coordinates auth, scanning, rendering, theme, and PWA updates.
@@ -10,6 +10,7 @@ GitHub Compliance is a static, local-first PWA. It keeps runtime dependencies at
 - `src/js/github-api.js` wraps GitHub REST calls, pagination, rate-limit state, repository scanning, and Renovate PR search.
 - `src/js/compliance.js` contains pure repository compliance rules.
 - `src/js/renovate-prs.js` classifies Renovate PRs from pull request text.
+- `src/js/export.js` serializes scan results (repositories and Renovate PRs) to JSON, YAML, and CSV.
 - `src/js/storage.js` stores settings in `localStorage` and scan snapshots in IndexedDB.
 - `src/js/demo-data.js` provides a self-contained mock of the GitHub REST endpoints for the no-login demo mode.
 - `public/sw.template.js` becomes `public/sw.js` during build so the cache version changes with every commit.
@@ -41,6 +42,15 @@ All repository data is local to the browser:
 - Scan snapshots: IndexedDB object store `scans`
 
 IndexedDB is used for scan results because 92+ repositories and pull request bodies can exceed comfortable `localStorage` limits.
+
+## Exporting Results
+
+Scan results can be exported to a local file from the control strip. The export combines both compliance results for every scanned repository and the open Renovate pull requests into a single payload, so the data can be handed to other tools or agents.
+
+- JSON and YAML keep the nested structure (`summary`, `repositories`, `renovatePullRequests`).
+- CSV flattens repositories and Renovate PRs into one table with a `recordType` column to distinguish the two record types.
+
+YAML is generated with [`js-yaml`](https://github.com/nodeca/js-yaml) and CSV with [`papaparse`](https://github.com/mholt/PapaParse). Both libraries are bundled into the static app, so export runs entirely in the browser and repository data never leaves the device.
 
 ## GitHub API Calls
 
@@ -93,7 +103,7 @@ Report-only observations:
 
 ## Testing
 
-- Unit tests cover pure compliance and Renovate PR parsing.
+- Unit tests cover pure compliance and Renovate PR parsing, and result export serialization.
 - Integration tests mock GitHub device-flow and REST endpoints in Playwright.
 - Accessibility tests inject axe-core into the app and fail on serious or critical issues.
 
