@@ -1,4 +1,6 @@
-import { renovateMergeSignals } from "./config.js";
+import { renovateMergeSignals, renovateStaleAutoMergeDays } from "./config.js";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function isRenovatePullRequest(pullRequest) {
   const author = pullRequest.user?.login ?? "";
@@ -26,22 +28,51 @@ export function classifyRenovatePullRequest(pullRequest, signals = renovateMerge
   return "unknown";
 }
 
-export function summarizeRenovatePullRequests(pullRequests) {
-  const renovatePullRequests = pullRequests.filter(isRenovatePullRequest).map((pullRequest) => ({
-    id: pullRequest.id,
-    number: pullRequest.number,
-    title: pullRequest.title,
-    repository: pullRequest.repository_url?.split("/repos/")[1] ?? pullRequest.base?.repo?.full_name ?? "Unknown repository",
-    url: pullRequest.html_url,
-    classification: classifyRenovatePullRequest(pullRequest),
-    updatedAt: pullRequest.updated_at
-  }));
+export function isStaleAutoMergePullRequest(pullRequest, classification, options = {}) {
+  if (classification !== "auto") {
+    return false;
+  }
+
+  const { now = Date.now(), staleAutoMergeDays = renovateStaleAutoMergeDays } = options;
+  const createdAt = pullRequest.created_at ?? pullRequest.createdAt;
+
+  if (!createdAt) {
+    return false;
+  }
+
+  const createdTime = new Date(createdAt).getTime();
+
+  if (Number.isNaN(createdTime)) {
+    return false;
+  }
+
+  return now - createdTime > staleAutoMergeDays * MS_PER_DAY;
+}
+
+export function summarizeRenovatePullRequests(pullRequests, options = {}) {
+  const renovatePullRequests = pullRequests.filter(isRenovatePullRequest).map((pullRequest) => {
+    const classification = classifyRenovatePullRequest(pullRequest);
+    const stale = isStaleAutoMergePullRequest(pullRequest, classification, options);
+
+    return {
+      id: pullRequest.id,
+      number: pullRequest.number,
+      title: pullRequest.title,
+      repository: pullRequest.repository_url?.split("/repos/")[1] ?? pullRequest.base?.repo?.full_name ?? "Unknown repository",
+      url: pullRequest.html_url,
+      classification,
+      stale,
+      createdAt: pullRequest.created_at,
+      updatedAt: pullRequest.updated_at
+    };
+  });
 
   return {
     total: renovatePullRequests.length,
     auto: renovatePullRequests.filter((pullRequest) => pullRequest.classification === "auto").length,
     manual: renovatePullRequests.filter((pullRequest) => pullRequest.classification === "manual").length,
     unknown: renovatePullRequests.filter((pullRequest) => pullRequest.classification === "unknown").length,
+    stale: renovatePullRequests.filter((pullRequest) => pullRequest.stale).length,
     pullRequests: renovatePullRequests
   };
 }

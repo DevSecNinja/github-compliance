@@ -638,7 +638,8 @@ function renderRenovate(summary) {
 
   const filteredPullRequests = filterRenovatePullRequests(summary.pullRequests);
   const filterText = filteredPullRequests.length === summary.pullRequests.length ? "" : ` Showing ${filteredPullRequests.length} of ${summary.pullRequests.length}.`;
-  elements.renovateSummary.textContent = `${summary.total} open. ${summary.auto} auto-merge, ${summary.manual} manual, ${summary.unknown} unknown.${filterText}`;
+  const staleText = summary.stale ? ` ${summary.stale} stale auto-merge.` : "";
+  elements.renovateSummary.textContent = `${summary.total} open. ${summary.auto} auto-merge, ${summary.manual} manual, ${summary.unknown} unknown.${staleText}${filterText}`;
 
   if (summary.pullRequests.length === 0) {
     elements.renovateList.innerHTML = `<p class="empty-state">No open Renovate pull requests found.</p>`;
@@ -654,13 +655,16 @@ function renderRenovate(summary) {
 
   elements.renovateList.replaceChildren(...filteredPullRequests.map((pullRequest) => {
     const card = document.createElement("article");
-    card.className = "renovate-card";
+    card.className = pullRequest.stale ? "renovate-card stale" : "renovate-card";
+    const pillStatus = pullRequest.classification === "manual" ? "fail" : pullRequest.stale ? "warn" : pullRequest.classification === "auto" ? "pass" : "warn";
+    const staleBadge = pullRequest.stale ? `<span class="status-pill warn">Open &gt;${appConfig.staleAutoMergeDays}d</span>` : "";
     card.innerHTML = `
-      <span class="status-pill ${pullRequest.classification === "manual" ? "fail" : pullRequest.classification === "auto" ? "pass" : "warn"}">${escapeHtml(pullRequest.classification)}</span>
+      <span class="status-pill ${pillStatus}">${escapeHtml(pullRequest.classification)}</span>
       <div>
         <a href="${pullRequest.url}" target="_blank" rel="noreferrer">${escapeHtml(pullRequest.title)}</a>
         <span class="meta-text">${escapeHtml(pullRequest.repository)} #${pullRequest.number}</span>
       </div>
+      ${staleBadge}
     `;
     return card;
   }));
@@ -672,7 +676,7 @@ function filterRenovatePullRequests(pullRequests) {
   const query = elements.renovateTextFilter.value.trim().toLowerCase();
 
   return pullRequests.filter((pullRequest) => {
-    const matchesMergeType = mergeType === "all" || (mergeType === "actionable" ? pullRequest.classification !== "auto" : pullRequest.classification === mergeType);
+    const matchesMergeType = mergeType === "all" || (mergeType === "actionable" ? (pullRequest.classification !== "auto" || pullRequest.stale) : pullRequest.classification === mergeType);
     const searchable = [pullRequest.title, pullRequest.repository, pullRequest.classification, String(pullRequest.number)].join("\n").toLowerCase();
     const matchesQuery = !query || searchable.includes(query);
 

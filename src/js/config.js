@@ -8,8 +8,11 @@ export const appConfig = {
   githubApiVersion: "2022-11-28",
   requestTimeoutMs: 20_000,
   scanConcurrency: 1,
-  stalePushDays: 180
+  stalePushDays: 180,
+  staleAutoMergeDays: 7
 };
+
+export const renovateStaleAutoMergeDays = appConfig.staleAutoMergeDays;
 
 export const renovateCentralPatterns = [
   /github>DevSecNinja\/\.github/i,
