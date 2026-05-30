@@ -1,6 +1,7 @@
 import { DeviceFlowAuth, canRefresh, tokenIsFresh } from "./auth-device-flow.js";
 import { relativeTime } from "./compliance.js";
 import { appConfig } from "./config.js";
+import { DEMO_OWNER, DEMO_TOKEN, createDemoFetcher, isDemoModeRequested } from "./demo-data.js";
 import { GitHubClient } from "./github-api.js";
 import { clearAuthState, loadAuthState, loadScanSnapshot, loadSettings, saveAuthState, saveScanSnapshot, saveSettings } from "./storage.js";
 import "../styles.css";
@@ -16,6 +17,9 @@ const elements = {
   deviceLink: document.querySelector("#device-link"),
   authStatus: document.querySelector("#auth-status"),
   authError: document.querySelector("#auth-error"),
+  demoButton: document.querySelector("#demo-button"),
+  demoBanner: document.querySelector("#demo-banner"),
+  exitDemo: document.querySelector("#exit-demo"),
   viewerLogin: document.querySelector("#viewer-login"),
   themeSelect: document.querySelector("#theme-select"),
   signOut: document.querySelector("#sign-out"),
@@ -60,6 +64,7 @@ const rateLimitBuckets = new Map();
 let currentScanResult;
 let activeScanController;
 let activeScanKind;
+let demoActive = false;
 
 bootstrap();
 
@@ -71,7 +76,9 @@ async function bootstrap() {
   await loadBuildMeta();
   registerServiceWorker();
 
-  if (authState) {
+  if (isDemoModeRequested()) {
+    await enterDemoMode();
+  } else if (authState) {
     await restoreSession();
   } else {
     showAuth();
@@ -87,6 +94,14 @@ function bindEvents() {
     await signIn();
   });
 
+  elements.demoButton?.addEventListener("click", async () => {
+    await enterDemoMode();
+  });
+
+  elements.exitDemo?.addEventListener("click", () => {
+    exitDemoMode();
+  });
+
   elements.themeSelect.addEventListener("change", () => {
     settings = { ...settings, theme: elements.themeSelect.value };
     saveSettings(settings);
@@ -94,6 +109,11 @@ function bindEvents() {
   });
 
   elements.signOut.addEventListener("click", () => {
+    if (demoActive) {
+      exitDemoMode();
+      return;
+    }
+
     auth.cancel();
     clearAuthState();
     authState = null;
@@ -210,6 +230,54 @@ async function openApp() {
   }
 }
 
+async function enterDemoMode() {
+  demoActive = true;
+  hideError();
+  auth.cancel();
+  authState = null;
+  currentScanResult = null;
+  rateLimitBuckets.clear();
+
+  client = new GitHubClient(DEMO_TOKEN, { fetcher: createDemoFetcher(), onRateLimit: renderRateLimit });
+  viewer = await client.getViewer();
+  elements.viewerLogin.textContent = viewer.login;
+  elements.authView.hidden = true;
+  elements.appView.hidden = false;
+  if (elements.demoBanner) {
+    elements.demoBanner.hidden = false;
+  }
+
+  settings = { ...settings, owner: DEMO_OWNER };
+  elements.scanOwner.value = DEMO_OWNER;
+  elements.themeSelect.value = settings.theme;
+  renderArchivedToggle();
+  updateAdvancedScanButton();
+  await renderInstallationHint(DEMO_OWNER);
+}
+
+function exitDemoMode() {
+  demoActive = false;
+  client = null;
+  viewer = null;
+  currentScanResult = null;
+  rateLimitBuckets.clear();
+
+  if (elements.demoBanner) {
+    elements.demoBanner.hidden = true;
+  }
+
+  settings = loadSettings();
+  showAuth();
+}
+
+async function persistScanSnapshot(owner, snapshot) {
+  if (demoActive) {
+    return;
+  }
+
+  await saveScanSnapshot(owner, snapshot);
+}
+
 async function renderInstallationHint(owner) {
   try {
     const owners = await client.getInstallationOwners();
@@ -241,7 +309,9 @@ async function scan() {
   const owner = elements.scanOwner.value.trim() || appConfig.defaultOwner;
   selectTab("repositories");
   settings = { ...settings, owner };
-  saveSettings(settings);
+  if (!demoActive) {
+    saveSettings(settings);
+  }
   startActiveScan("fast");
   elements.progress.textContent = "Scanning repositories...";
   currentScanResult = null;
@@ -286,7 +356,7 @@ async function scan() {
     });
 
     currentScanResult = result;
-    await saveScanSnapshot(owner, result);
+    await persistScanSnapshot(owner, result);
     renderScan(result);
   } catch (error) {
     if (error?.name === "AbortError") {
@@ -350,7 +420,7 @@ async function advancedScan() {
         advancedRateLimitResetAt: result.rateLimitResetAt
       }
     };
-    await saveScanSnapshot(currentScanResult.owner, currentScanResult);
+    await persistScanSnapshot(currentScanResult.owner, currentScanResult);
     renderScan(currentScanResult);
   } catch (error) {
     if (error?.name === "AbortError") {
@@ -368,7 +438,7 @@ async function advancedScan() {
 async function savePartialScan(owner, message) {
   if (currentScanResult?.repositories?.length) {
     currentScanResult.scannedAt = new Date().toISOString();
-    await saveScanSnapshot(owner, currentScanResult);
+    await persistScanSnapshot(owner, currentScanResult);
     renderScan(currentScanResult);
   }
 
@@ -466,7 +536,7 @@ async function refreshRenovatePullRequests() {
       ...currentScanResult,
       renovate
     };
-    await saveScanSnapshot(currentScanResult.owner, currentScanResult);
+    await persistScanSnapshot(currentScanResult.owner, currentScanResult);
     renderRenovate(renovate);
   } catch (error) {
     renderRenovate({ total: 0, auto: 0, manual: 0, unknown: 0, pullRequests: [], error: cleanError(error) });
