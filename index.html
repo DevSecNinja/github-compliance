@@ -69,6 +69,15 @@
         <button id="include-archived" class="toggle-action" type="button" aria-pressed="false">Include archived</button>
         <button id="scan-button" class="primary-action" type="button">Scan repositories</button>
         <button id="advanced-scan-button" class="ghost-action" type="button" disabled>Advanced scan</button>
+        <label>
+          Export
+          <select id="export-format">
+            <option value="json">JSON</option>
+            <option value="yaml">YAML</option>
+            <option value="csv">CSV</option>
+          </select>
+        </label>
+        <button id="export-button" class="ghost-action" type="button" disabled>Export results</button>
       </section>
 
       <section class="status-line" aria-live="polite">

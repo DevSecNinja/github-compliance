@@ -144,6 +144,34 @@ test("pauses a running fast scan", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Scan repositories" })).toBeVisible();
 });
 
+test("exports scan results to a downloadable file", async ({ page }) => {
+  await mockGitHub(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+  await expect(page.getByRole("button", { name: "Export results" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Scan repositories" }).click();
+  await expect(page.getByRole("link", { name: "travel-prep" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export results" })).toBeEnabled();
+
+  await page.getByLabel("Export").selectOption("yaml");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export results" }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toMatch(/^github-compliance-DevSecNinja-\d{4}-\d{2}-\d{2}\.yaml$/);
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  const content = Buffer.concat(chunks).toString("utf8");
+  expect(content).toContain("owner: DevSecNinja");
+  expect(content).toContain("renovatePullRequests:");
+  expect(content).toContain("travel-prep");
+});
+
 async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo, delayTree = false, rulesetsUnavailable = false } = {}) {
   const encodedRenovate = btoa('extends: ["github>DevSecNinja/.github//.renovate/base.json5"]');
   const encodedReadme = btoa("# Travel Prep");

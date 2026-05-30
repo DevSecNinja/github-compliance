@@ -17,5 +17,9 @@
     "@playwright/test": "1.60.0",
     "axe-core": "4.11.4",
     "vite": "8.0.14"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1",
+    "papaparse": "^5.5.3"
   }
 }

@@ -326,7 +326,7 @@ h2 {
 .control-strip {
   display: grid;
   align-items: end;
-  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto auto auto;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto auto auto auto auto;
   padding: 1rem;
 }
 

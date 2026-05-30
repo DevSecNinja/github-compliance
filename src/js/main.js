@@ -2,6 +2,7 @@ import { DeviceFlowAuth, canRefresh, tokenIsFresh } from "./auth-device-flow.js"
 import { relativeTime } from "./compliance.js";
 import { appConfig } from "./config.js";
 import { GitHubClient } from "./github-api.js";
+import { serializeExport } from "./export.js";
 import { clearAuthState, loadAuthState, loadScanSnapshot, loadSettings, saveAuthState, saveScanSnapshot, saveSettings } from "./storage.js";
 import "../styles.css";
 
@@ -23,6 +24,8 @@ const elements = {
   includeArchived: document.querySelector("#include-archived"),
   scanButton: document.querySelector("#scan-button"),
   advancedScanButton: document.querySelector("#advanced-scan-button"),
+  exportFormat: document.querySelector("#export-format"),
+  exportButton: document.querySelector("#export-button"),
   networkStatus: document.querySelector("#network-status"),
   rateLimit: document.querySelector("#rate-limit"),
   lastScan: document.querySelector("#last-scan"),
@@ -110,6 +113,7 @@ function bindEvents() {
 
   elements.scanButton.addEventListener("click", scan);
   elements.advancedScanButton.addEventListener("click", advancedScan);
+  elements.exportButton.addEventListener("click", exportResults);
   elements.refreshRenovateButton.addEventListener("click", refreshRenovatePullRequests);
   elements.tabs.forEach((tab) => {
     tab.addEventListener("click", () => selectTab(tab.dataset.tab));
@@ -391,6 +395,7 @@ function startActiveScan(kind) {
 
   elements.includeArchived.disabled = true;
   elements.refreshRenovateButton.disabled = true;
+  elements.exportButton.disabled = true;
 }
 
 function stopActiveScan(kind) {
@@ -405,6 +410,7 @@ function stopActiveScan(kind) {
   elements.advancedScanButton.textContent = "Advanced scan";
   elements.includeArchived.disabled = false;
   updateRefreshRenovateButton();
+  updateExportButton();
 }
 
 function pauseActiveScan(message) {
@@ -438,6 +444,7 @@ function renderScan(result, { cached = false } = {}) {
   renderRenovate(result.renovate);
   updateAdvancedScanButton();
   updateRefreshRenovateButton();
+  updateExportButton();
 }
 
 function renderCurrentScan() {
@@ -741,6 +748,28 @@ function updateAdvancedScanButton() {
 
 function updateRefreshRenovateButton() {
   elements.refreshRenovateButton.disabled = Boolean(activeScanKind) || !client || !currentScanResult?.repositories?.length;
+}
+
+function updateExportButton() {
+  elements.exportButton.disabled = Boolean(activeScanKind) || !currentScanResult?.repositories?.length;
+}
+
+function exportResults() {
+  if (!currentScanResult?.repositories?.length) {
+    return;
+  }
+
+  const format = elements.exportFormat.value;
+  const { filename, mimeType, content } = serializeExport(currentScanResult, format);
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function applyTheme(theme) {
