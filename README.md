@@ -14,6 +14,7 @@ GitHub Compliance is a local-first PWA for reviewing repository governance acros
 - Supports light, dark, and automatic themes.
 - Supports offline loading of the app shell and previously cached scan data.
 - Refreshes installed PWA clients after every deployed commit through commit-versioned service worker caches.
+- Includes a no-login demo mode with realistic mocked data for quickly testing preview deployments.
 
 ## GitHub App Setup
 
@@ -49,6 +50,12 @@ In VS Code, run **Open web page** from the task picker. It starts the web server
 The dashboard uses a rate-limit-conscious fast scan. For each repository it fetches the default-branch Git tree and only downloads the Renovate config file when present. That keeps the scan to roughly two repository-specific requests per repository instead of many separate file, issue, and ruleset requests.
 
 If GitHub returns a rate-limit response, the app stops starting new repository checks, marks the remaining repositories as skipped, and shows the reset time when GitHub provides one.
+
+## Demo Mode
+
+To explore the dashboard without signing in or spending GitHub API calls, open the app with a `?demo` query parameter (for example `https://<preview-url>/?demo`) or click **View demo with sample data** on the sign-in screen.
+
+Demo mode serves a fixed sample dataset through a local mock of the GitHub REST API, so scanning, compliance checks, and Renovate PR classification behave just like a real run. It is ephemeral and does not read or write any local settings, tokens, or scan snapshots. This makes it convenient for validating Cloudflare Pages pull request preview deployments. Use the **Exit demo** banner action to return to the sign-in screen.
 
 ## Tests
 

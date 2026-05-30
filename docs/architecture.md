@@ -11,6 +11,7 @@ GitHub Compliance is a static, local-first PWA. It keeps runtime dependencies at
 - `src/js/compliance.js` contains pure repository compliance rules.
 - `src/js/renovate-prs.js` classifies Renovate PRs from pull request text.
 - `src/js/storage.js` stores settings in `localStorage` and scan snapshots in IndexedDB.
+- `src/js/demo-data.js` provides a self-contained mock of the GitHub REST endpoints for the no-login demo mode.
 - `public/sw.template.js` becomes `public/sw.js` during build so the cache version changes with every commit.
 
 ## Authentication
@@ -56,6 +57,16 @@ The app uses the REST API with `X-GitHub-Api-Version: 2022-11-28`.
 Repository scanning runs with a concurrency of one to reduce rate-limit pressure. If GitHub returns a rate-limit response, the app stops starting new repository requests, marks the remaining repositories as skipped, and shows the reset time when available.
 
 If `GET /user/installations` does not include `DevSecNinja`, the app shows the installation accounts GitHub did return. That means the signed-in user token is valid, but the requested owner is not visible to that user/app installation combination.
+
+## Demo Mode
+
+Demo mode lets pull request preview deployments (for example Cloudflare Pages PR builds) be tested without signing in or spending real GitHub API calls.
+
+It is enabled with a `?demo` query parameter, which makes a preview build shareable as a ready-to-test link, or with the "View demo with sample data" button on the sign-in screen.
+
+`src/js/demo-data.js` supplies a `fetch`-compatible function that is passed to `GitHubClient` in place of the real network call. It returns responses that match the shape of the real GitHub REST API (including rate-limit headers), so the scanner, compliance rules, and Renovate PR classification all run unchanged against a fixed sample dataset of repositories and pull requests with a mix of compliant and non-compliant states.
+
+Demo mode is fully ephemeral: it does not read or write settings, auth state, or scan snapshots, so it never pollutes a real user's stored data. The "Exit demo" banner action returns to the sign-in screen.
 
 ## Compliance Rules
 

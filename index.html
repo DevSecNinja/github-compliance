@@ -30,6 +30,9 @@
           <button class="primary-action" type="submit">Sign in with GitHub</button>
         </form>
 
+        <p class="demo-hint">Just exploring or testing a preview build? Skip sign-in and load realistic mock data.</p>
+        <button id="demo-button" class="secondary-action" type="button">View demo with sample data</button>
+
         <section id="device-panel" class="device-panel" aria-labelledby="device-title" hidden>
           <h2 id="device-title">Enter this code on GitHub</h2>
           <div id="device-code" class="device-code" aria-live="polite">----</div>
@@ -42,6 +45,10 @@
     </main>
 
     <main id="app-view" class="app-shell" hidden>
+      <aside id="demo-banner" class="demo-banner" role="status" hidden>
+        <span><strong>Demo mode.</strong> Showing sample data mocked locally. No GitHub calls are made and nothing is stored.</span>
+        <button id="exit-demo" class="ghost-action" type="button">Exit demo</button>
+      </aside>
       <header class="topbar">
         <div>
           <p class="eyebrow">Repository control center</p>
