@@ -172,6 +172,33 @@ test("exports scan results to a downloadable file", async ({ page }) => {
   expect(content).toContain("travel-prep");
 });
 
+test("adds a custom repository, scans it, and persists it in browser storage", async ({ page }) => {
+  await mockGitHub(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+  await expect(page.getByText("Signed in as")).toBeVisible();
+
+  const customRepos = page.locator(".custom-repos");
+  await expect(customRepos.getByText("No custom repositories added yet.")).toBeVisible();
+
+  await customRepos.getByLabel("Repository").fill("https://github.com/other-org/widget");
+  await customRepos.getByRole("button", { name: "Add repository" }).click();
+
+  await expect(customRepos.getByRole("link", { name: "other-org/widget" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Scan repositories" }).click();
+
+  await expect(page.locator("#repo-rows").getByRole("link", { name: "widget" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("Signed in as")).toBeVisible();
+  await expect(page.locator(".custom-repos").getByRole("link", { name: "other-org/widget" })).toBeVisible();
+
+  await page.locator(".custom-repos").getByRole("button", { name: "Remove other-org/widget" }).click();
+  await expect(page.locator(".custom-repos").getByText("No custom repositories added yet.")).toBeVisible();
+});
+
 async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo, delayTree = false, rulesetsUnavailable = false } = {}) {
   const encodedRenovate = btoa('extends: ["github>DevSecNinja/.github//.renovate/base.json5"]');
   const encodedReadme = btoa("# Travel Prep");
@@ -224,6 +251,11 @@ async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo
           repositories: [repository("travel-prep", false), repository("old-tool", true), ...(failingRepo ? [repository(failingRepo, false)] : []), ...(rateLimitedRepo ? [repository(rateLimitedRepo, false)] : [])]
         }
       });
+      return;
+    }
+
+    if (path === "/repos/other-org/widget") {
+      await route.fulfill({ json: customRepository("widget") });
       return;
     }
 
@@ -371,6 +403,22 @@ function repository(name, archived) {
     pushed_at: new Date().toISOString(),
     license: { spdx_id: "MIT" },
     owner: { login: "DevSecNinja" }
+  };
+}
+
+function customRepository(name) {
+  return {
+    id: 99,
+    name,
+    full_name: `other-org/${name}`,
+    html_url: `https://github.com/other-org/${name}`,
+    description: "Repository from another owner",
+    archived: false,
+    private: false,
+    default_branch: "main",
+    pushed_at: new Date().toISOString(),
+    license: { spdx_id: "MIT" },
+    owner: { login: "other-org" }
   };
 }
 

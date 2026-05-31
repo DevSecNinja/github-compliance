@@ -41,6 +41,8 @@ All repository data is local to the browser:
 - Remembered auth: `localStorage`
 - Scan snapshots: IndexedDB object store `scans`
 
+Custom repositories (repositories from any owner that the user adds manually) are part of settings, so they persist in `localStorage` only. No external database is required.
+
 IndexedDB is used for scan results because 92+ repositories and pull request bodies can exceed comfortable `localStorage` limits.
 
 ## Exporting Results
@@ -59,10 +61,11 @@ The app uses the REST API with `X-GitHub-Api-Version: 2022-11-28`.
 - `GET /user` validates the token and shows the viewer.
 - `GET /user/installations` finds the `DevSecNinja` installation.
 - `GET /user/installations/{installation_id}/repositories` lists repositories available to the app and user.
+- `GET /repos/{owner}/{repo}` resolves repositories that the user added manually (custom repositories), which may belong to any owner and are merged into the scan list.
 - `GET /repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1` checks CODEOWNERS, license, README, workflow presence, and whether Renovate config exists.
 - `GET /repos/{owner}/{repo}/contents/{renovate_path}` downloads Renovate config only when the tree shows one exists.
 - Branch rulesets and open issue counts are intentionally skipped in the fast scan to avoid exhausting REST API limits across many repositories.
-- `GET /search/issues?q=org:{owner} is:pr is:open renovate` finds open Renovate PRs.
+- `GET /search/issues?q=org:{owner} is:pr is:open renovate` finds open Renovate PRs. Custom repositories outside the primary owner are searched separately with `repo:{owner}/{repo}` qualifiers.
 
 Repository scanning runs with a concurrency of one to reduce rate-limit pressure. If GitHub returns a rate-limit response, the app stops starting new repository requests, marks the remaining repositories as skipped, and shows the reset time when available.
 

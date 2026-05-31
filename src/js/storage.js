@@ -7,17 +7,78 @@ const databaseName = "github-compliance";
 const databaseVersion = 1;
 
 export function loadSettings() {
+  const stored = readJson(localStorage.getItem(settingsKey)) ?? {};
+
   return {
     theme: "auto",
     owner: appConfig.defaultOwner,
     includeArchived: false,
     rememberDevice: false,
-    ...readJson(localStorage.getItem(settingsKey))
+    ...stored,
+    customRepositories: normalizeCustomRepositories(stored.customRepositories)
   };
 }
 
 export function saveSettings(settings) {
   localStorage.setItem(settingsKey, JSON.stringify(settings));
+}
+
+// Accepts a repository reference such as "owner/repo", a full GitHub URL, or a
+// "git@github.com:owner/repo.git" remote and returns the canonical "owner/repo"
+// form. Returns null when the value does not look like a repository reference.
+export function parseRepositoryReference(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  let candidate = value.trim();
+
+  if (!candidate) {
+    return null;
+  }
+
+  candidate = candidate
+    .replace(/^git@github\.com:/i, "")
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+    .replace(/^github\.com\//i, "")
+    .replace(/\.git$/i, "")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+
+  const match = candidate.match(/^([A-Za-z0-9-._]+)\/([A-Za-z0-9-._]+)/);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, owner, repo] = match;
+
+  if (owner === "." || owner === ".." || repo === "." || repo === "..") {
+    return null;
+  }
+
+  return `${owner}/${repo}`;
+}
+
+function normalizeCustomRepositories(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const result = [];
+
+  for (const entry of value) {
+    const fullName = parseRepositoryReference(entry);
+    const key = fullName?.toLowerCase();
+
+    if (fullName && !seen.has(key)) {
+      seen.add(key);
+      result.push(fullName);
+    }
+  }
+
+  return result;
 }
 
 export function saveAuthState(authState, rememberDevice) {
