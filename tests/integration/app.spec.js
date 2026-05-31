@@ -199,6 +199,23 @@ test("adds a custom repository, scans it, and persists it in browser storage", a
   await expect(page.locator(".custom-repos").getByText("No custom repositories added yet.")).toBeVisible();
 });
 
+test("rejects a custom repository that cannot be accessed", async ({ page }) => {
+  await mockGitHub(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+  await expect(page.getByText("Signed in as")).toBeVisible();
+
+  const customRepos = page.locator(".custom-repos");
+
+  await customRepos.getByLabel("Repository").fill("other-org/missing");
+  await customRepos.getByRole("button", { name: "Add repository" }).click();
+
+  await expect(customRepos.locator("#custom-repo-error")).toContainText("We couldn't access other-org/missing");
+  await expect(customRepos.getByText("No custom repositories added yet.")).toBeVisible();
+  await expect(customRepos.getByRole("link", { name: "other-org/missing" })).toHaveCount(0);
+});
+
 async function mockGitHub(page, { installationOwner = "DevSecNinja", failingRepo, rateLimitedRepo, delayTree = false, rulesetsUnavailable = false } = {}) {
   const encodedRenovate = btoa('extends: ["github>DevSecNinja/.github//.renovate/base.json5"]');
   const encodedReadme = btoa("# Travel Prep");

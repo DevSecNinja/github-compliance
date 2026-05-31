@@ -32,6 +32,7 @@ const elements = {
   exportButton: document.querySelector("#export-button"),
   customRepoForm: document.querySelector("#custom-repo-form"),
   customRepoInput: document.querySelector("#custom-repo-input"),
+  customRepoAdd: document.querySelector("#add-custom-repo"),
   customRepoError: document.querySelector("#custom-repo-error"),
   customRepoList: document.querySelector("#custom-repo-list"),
   networkStatus: document.querySelector("#network-status"),
@@ -814,6 +815,16 @@ function addCustomRepository() {
     return;
   }
 
+  return verifyAndAddCustomRepository(fullName, existing);
+}
+
+async function verifyAndAddCustomRepository(fullName, existing) {
+  const accessError = await checkCustomRepositoryAccess(fullName);
+  if (accessError) {
+    showCustomRepoError(accessError);
+    return;
+  }
+
   settings = { ...settings, customRepositories: [...existing, fullName] };
   if (!demoActive) {
     saveSettings(settings);
@@ -821,6 +832,37 @@ function addCustomRepository() {
 
   elements.customRepoInput.value = "";
   renderCustomRepositories();
+}
+
+async function checkCustomRepositoryAccess(fullName) {
+  // Custom repositories are not scanned in demo mode, so there is no live
+  // client to verify access against; accept the entry without a check.
+  if (demoActive || !client) {
+    return null;
+  }
+
+  setCustomRepoChecking(true);
+  try {
+    const repo = await client.getRepository(fullName);
+    if (!repo) {
+      return `We couldn't access ${fullName}. Confirm the repository exists and that the GitHub App is installed and authorized for it.`;
+    }
+
+    return null;
+  } catch (error) {
+    return `We couldn't access ${fullName}: ${cleanError(error)}`;
+  } finally {
+    setCustomRepoChecking(false);
+  }
+}
+
+function setCustomRepoChecking(active) {
+  if (!elements.customRepoAdd) {
+    return;
+  }
+
+  elements.customRepoAdd.disabled = active;
+  elements.customRepoAdd.textContent = active ? "Checking access…" : "Add repository";
 }
 
 function removeCustomRepository(fullName) {
