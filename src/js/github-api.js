@@ -196,7 +196,7 @@ export class GitHubClient {
           return { ...repo, custom: true };
         }
 
-        return buildMissingCustomRepository(fullName, "Repository not found or no access.");
+        return buildMissingCustomRepository(fullName, "Repository not found, or the GitHub App is not installed or authorized for it.");
       } catch (error) {
         if (error?.name === "AbortError") {
           throw error;
