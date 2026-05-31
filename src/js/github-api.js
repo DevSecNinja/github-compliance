@@ -143,21 +143,77 @@ export class GitHubClient {
     return (includeArchived ? repositories : repositories.filter((repo) => !repo.archived)).sort((left, right) => new Date(right.pushed_at ?? 0) - new Date(left.pushed_at ?? 0));
   }
 
-  async getInstallationRepositoryInventory({ owner, includeArchived, signal }) {
-    const installation = await this.requireInstallationForOwner(owner, { signal });
-    const allRepositories = await this.paginateCollection(`/user/installations/${installation.id}/repositories?per_page=100`, "repositories", { signal });
-    const repositories = includeArchived ? allRepositories : allRepositories.filter((repo) => !repo.archived);
+  async getInstallationRepositoryInventory({ owner, includeArchived, signal, customRepositories = [] }) {
+    let installationRepositories = [];
+    let installation = null;
+    let installationError = null;
+
+    try {
+      installation = await this.requireInstallationForOwner(owner, { signal });
+      installationRepositories = await this.paginateCollection(`/user/installations/${installation.id}/repositories?per_page=100`, "repositories", { signal });
+    } catch (error) {
+      if (!customRepositories.length) {
+        throw error;
+      }
+
+      installationError = error;
+    }
+
+    const customRepos = await this.fetchCustomRepositories(customRepositories, { signal });
+
+    const byId = new Map();
+    for (const repo of installationRepositories) {
+      byId.set(String(repo.id), repo);
+    }
+    for (const repo of customRepos) {
+      byId.set(String(repo.id), repo);
+    }
+
+    const allRepositories = [...byId.values()];
+    // Custom repositories were added explicitly, so they are scanned even when
+    // archived repositories are otherwise excluded.
+    const repositories = includeArchived ? allRepositories : allRepositories.filter((repo) => repo.custom || !repo.archived);
 
     return {
       installation,
+      installationError,
       totalCount: allRepositories.length,
       archivedCount: allRepositories.filter((repo) => repo.archived).length,
       repositories: repositories.sort((left, right) => new Date(right.pushed_at ?? 0) - new Date(left.pushed_at ?? 0))
     };
   }
 
-  async scanRepositories({ owner, includeArchived, signal, onProgress, onRepositoryResult }) {
-    const inventory = await this.getInstallationRepositoryInventory({ owner, includeArchived, signal });
+  async fetchCustomRepositories(customRepositories = [], options = {}) {
+    const fullNames = normalizeFullNames(customRepositories);
+
+    return mapLimit(fullNames, appConfig.scanConcurrency, async (fullName) => {
+      throwIfAborted(options.signal);
+
+      try {
+        const repo = await this.getRepository(fullName, options);
+
+        if (repo) {
+          return { ...repo, custom: true };
+        }
+
+        return buildMissingCustomRepository(fullName, "Repository not found or no access.");
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          throw error;
+        }
+
+        return buildMissingCustomRepository(fullName, cleanError(error));
+      }
+    }, options.signal);
+  }
+
+  getRepository(fullName, options = {}) {
+    const [owner, repo] = fullName.split("/");
+    return this.json(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, options);
+  }
+
+  async scanRepositories({ owner, includeArchived, customRepositories = [], signal, onProgress, onRepositoryResult }) {
+    const inventory = await this.getInstallationRepositoryInventory({ owner, includeArchived, signal, customRepositories });
     const repositories = inventory.repositories;
     let completed = 0;
     let rateLimitError = null;
@@ -166,6 +222,14 @@ export class GitHubClient {
 
     const results = await mapLimit(repositories, appConfig.scanConcurrency, async (repo) => {
       throwIfAborted(signal);
+
+      if (repo.fetchError) {
+        const result = buildFailedRepository(repo, new Error(repo.fetchError));
+        completed += 1;
+        onRepositoryResult?.(result, { completed, total: repositories.length });
+        onProgress?.({ completed, total: repositories.length, repo: repo.name });
+        return result;
+      }
 
       if (rateLimitError) {
         return buildSkippedRepository(repo, rateLimitError);
@@ -347,12 +411,40 @@ export class GitHubClient {
   }
 
   async getRenovatePullRequests(owner, repositories, options = {}) {
-    const query = encodeURIComponent(`org:${owner} is:pr is:open author:renovate[bot]`);
-    const result = await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items", options);
-    const allowedRepositories = new Set(repositories.map((repo) => repo.full_name ?? repo.fullName));
-    const pullRequests = result.filter((item) => item.pull_request && allowedRepositories.has(repositoryFromApiUrl(item.repository_url)));
+    const allowedRepositories = new Set(repositories.map((repo) => repo.full_name ?? repo.fullName).filter(Boolean));
+    const ownerItems = await this.searchRenovatePullRequestsForOwner(owner, options);
+
+    // Repositories outside the primary owner (manually added custom repos) are
+    // not covered by the owner-scoped search, so query them by repository.
+    const extraFullNames = [...allowedRepositories].filter((fullName) => repositoryOwner(fullName).toLowerCase() !== owner.toLowerCase());
+    const extraItems = await this.searchRenovatePullRequestsForRepositories(extraFullNames, options);
+
+    const items = dedupeById([...ownerItems, ...extraItems]);
+    const pullRequests = items.filter((item) => item.pull_request && allowedRepositories.has(repositoryFromApiUrl(item.repository_url)));
     const hydratedPullRequests = await mapLimit(pullRequests, 2, (pullRequest) => this.hydratePullRequestIssue(pullRequest, options), options.signal);
     return summarizeRenovatePullRequests(hydratedPullRequests);
+  }
+
+  searchRenovatePullRequestsForOwner(owner, options = {}) {
+    const query = encodeURIComponent(`org:${owner} is:pr is:open author:renovate[bot]`);
+    return this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items", options);
+  }
+
+  async searchRenovatePullRequestsForRepositories(fullNames, options = {}) {
+    if (!fullNames.length) {
+      return [];
+    }
+
+    const items = [];
+
+    for (const batch of chunk(fullNames, 5)) {
+      throwIfAborted(options.signal);
+      const repoQualifiers = batch.map((fullName) => `repo:${fullName}`).join(" ");
+      const query = encodeURIComponent(`${repoQualifiers} is:pr is:open author:renovate[bot]`);
+      items.push(...(await this.paginateCollection(`/search/issues?q=${query}&per_page=100`, "items", options)));
+    }
+
+    return items;
   }
 
   async hydratePullRequestIssue(pullRequest, options = {}) {
@@ -394,6 +486,71 @@ function findFirstPath(paths, candidates) {
 
 function repositoryFromApiUrl(repositoryUrl) {
   return repositoryUrl?.split("/repos/")[1] ?? "";
+}
+
+function repositoryOwner(fullName) {
+  return String(fullName ?? "").split("/")[0] ?? "";
+}
+
+function normalizeFullNames(fullNames) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of fullNames ?? []) {
+    const fullName = String(value ?? "").trim();
+    const key = fullName.toLowerCase();
+
+    if (/^[^/]+\/[^/]+$/.test(fullName) && !seen.has(key)) {
+      seen.add(key);
+      result.push(fullName);
+    }
+  }
+
+  return result;
+}
+
+function chunk(items, size) {
+  const result = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+
+  return result;
+}
+
+function dedupeById(items) {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const key = item?.id ?? `${item?.repository_url}#${item?.number}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildMissingCustomRepository(fullName, message) {
+  const [owner, name] = fullName.split("/");
+
+  return {
+    id: `custom:${fullName}`,
+    name,
+    full_name: fullName,
+    html_url: `https://github.com/${fullName}`,
+    description: "",
+    archived: false,
+    private: false,
+    default_branch: null,
+    pushed_at: null,
+    owner: { login: owner },
+    custom: true,
+    fetchError: message
+  };
 }
 
 function getNextLink(linkHeader) {

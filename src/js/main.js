@@ -4,7 +4,7 @@ import { appConfig } from "./config.js";
 import { DEMO_OWNER, DEMO_TOKEN, createDemoFetcher, isDemoModeRequested } from "./demo-data.js";
 import { GitHubClient } from "./github-api.js";
 import { serializeExport } from "./export.js";
-import { clearAuthState, loadAuthState, loadScanSnapshot, loadSettings, saveAuthState, saveScanSnapshot, saveSettings } from "./storage.js";
+import { clearAuthState, loadAuthState, loadScanSnapshot, loadSettings, parseRepositoryReference, saveAuthState, saveScanSnapshot, saveSettings } from "./storage.js";
 import "../styles.css";
 
 const elements = {
@@ -30,6 +30,10 @@ const elements = {
   advancedScanButton: document.querySelector("#advanced-scan-button"),
   exportFormat: document.querySelector("#export-format"),
   exportButton: document.querySelector("#export-button"),
+  customRepoForm: document.querySelector("#custom-repo-form"),
+  customRepoInput: document.querySelector("#custom-repo-input"),
+  customRepoError: document.querySelector("#custom-repo-error"),
+  customRepoList: document.querySelector("#custom-repo-list"),
   networkStatus: document.querySelector("#network-status"),
   rateLimit: document.querySelector("#rate-limit"),
   lastScan: document.querySelector("#last-scan"),
@@ -134,6 +138,10 @@ function bindEvents() {
   elements.scanButton.addEventListener("click", scan);
   elements.advancedScanButton.addEventListener("click", advancedScan);
   elements.exportButton.addEventListener("click", exportResults);
+  elements.customRepoForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    addCustomRepository();
+  });
   elements.refreshRenovateButton.addEventListener("click", refreshRenovatePullRequests);
   elements.tabs.forEach((tab) => {
     tab.addEventListener("click", () => selectTab(tab.dataset.tab));
@@ -223,7 +231,7 @@ async function openApp() {
   elements.scanOwner.value = settings.owner || appConfig.defaultOwner;
   elements.themeSelect.value = settings.theme;
   renderArchivedToggle();
-
+  renderCustomRepositories();
   const cached = await loadScanSnapshot(settings.owner);
   if (cached) {
     currentScanResult = cached;
@@ -255,6 +263,7 @@ async function enterDemoMode() {
   elements.scanOwner.value = DEMO_OWNER;
   elements.themeSelect.value = settings.theme;
   renderArchivedToggle();
+  renderCustomRepositories();
   updateAdvancedScanButton();
   await renderInstallationHint(DEMO_OWNER);
 }
@@ -325,6 +334,7 @@ async function scan() {
     const result = await client.scanRepositories({
       owner,
       includeArchived: settings.includeArchived,
+      customRepositories: activeCustomRepositories(),
       signal: activeScanController.signal,
       onProgress: ({ completed, total, repo, inventory }) => {
         if (inventory) {
@@ -777,6 +787,107 @@ function showAuth() {
 function renderArchivedToggle() {
   elements.includeArchived.setAttribute("aria-pressed", String(settings.includeArchived));
   elements.includeArchived.textContent = settings.includeArchived ? "Archived included" : "Include archived";
+}
+
+function getCustomRepositories() {
+  return Array.isArray(settings.customRepositories) ? settings.customRepositories : [];
+}
+
+function activeCustomRepositories() {
+  // Custom repositories are real GitHub repositories, so they are not scanned
+  // in demo mode where every request is served from local mock data.
+  return demoActive ? [] : getCustomRepositories();
+}
+
+function addCustomRepository() {
+  hideCustomRepoError();
+  const fullName = parseRepositoryReference(elements.customRepoInput.value);
+
+  if (!fullName) {
+    showCustomRepoError("Enter a repository as owner/repo or a github.com URL.");
+    return;
+  }
+
+  const existing = getCustomRepositories();
+  if (existing.some((entry) => entry.toLowerCase() === fullName.toLowerCase())) {
+    showCustomRepoError(`${fullName} is already in the list.`);
+    return;
+  }
+
+  settings = { ...settings, customRepositories: [...existing, fullName] };
+  if (!demoActive) {
+    saveSettings(settings);
+  }
+
+  elements.customRepoInput.value = "";
+  renderCustomRepositories();
+}
+
+function removeCustomRepository(fullName) {
+  const existing = getCustomRepositories();
+  settings = { ...settings, customRepositories: existing.filter((entry) => entry !== fullName) };
+  if (!demoActive) {
+    saveSettings(settings);
+  }
+
+  hideCustomRepoError();
+  renderCustomRepositories();
+}
+
+function renderCustomRepositories() {
+  if (!elements.customRepoList) {
+    return;
+  }
+
+  const repositories = getCustomRepositories();
+
+  if (repositories.length === 0) {
+    elements.customRepoList.replaceChildren();
+    const empty = document.createElement("li");
+    empty.className = "custom-repo-empty";
+    empty.textContent = "No custom repositories added yet.";
+    elements.customRepoList.appendChild(empty);
+    return;
+  }
+
+  elements.customRepoList.replaceChildren(...repositories.map((fullName) => {
+    const item = document.createElement("li");
+    item.className = "custom-repo-item";
+
+    const link = document.createElement("a");
+    link.href = `https://github.com/${fullName.split("/").map(encodeURIComponent).join("/")}`;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = fullName;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "ghost-action";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${fullName}`);
+    remove.addEventListener("click", () => removeCustomRepository(fullName));
+
+    item.append(link, remove);
+    return item;
+  }));
+}
+
+function showCustomRepoError(message) {
+  if (!elements.customRepoError) {
+    return;
+  }
+
+  elements.customRepoError.textContent = message;
+  elements.customRepoError.hidden = false;
+}
+
+function hideCustomRepoError() {
+  if (!elements.customRepoError) {
+    return;
+  }
+
+  elements.customRepoError.textContent = "";
+  elements.customRepoError.hidden = true;
 }
 
 function selectTab(name) {

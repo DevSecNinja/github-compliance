@@ -87,6 +87,22 @@
         <button id="export-button" class="ghost-action" type="button" disabled>Export results</button>
       </section>
 
+      <section class="custom-repos" aria-labelledby="custom-repos-title">
+        <div class="custom-repos-heading">
+          <h2 id="custom-repos-title">Custom repositories</h2>
+          <p>Add repositories from any owner to include them in scans and Renovate checks. They are stored only in this browser.</p>
+        </div>
+        <form id="custom-repo-form" class="custom-repo-form">
+          <label>
+            Repository
+            <input id="custom-repo-input" type="text" autocomplete="off" placeholder="owner/repo or https://github.com/owner/repo" />
+          </label>
+          <button id="add-custom-repo" class="ghost-action" type="submit">Add repository</button>
+        </form>
+        <p id="custom-repo-error" class="error-message" role="alert" hidden></p>
+        <ul id="custom-repo-list" class="custom-repo-list" aria-label="Custom repositories"></ul>
+      </section>
+
       <section class="status-line" aria-live="polite">
         <span id="network-status">Online</span>
         <span id="rate-limit">Rate limit unknown</span>

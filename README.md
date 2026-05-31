@@ -8,6 +8,7 @@ GitHub Compliance is a local-first PWA for reviewing repository governance acros
 - Uses GitHub App device flow for App ID `3844070`.
 - Stores settings, tokens, scan results, and Renovate snapshots locally in this browser.
 - Excludes archived repositories by default, with an include toggle.
+- Lets you add custom repositories from any owner by `owner/repo` or GitHub URL, included in both scans and Renovate checks and stored only in this browser.
 - Fast scan checks repository names, descriptions, last push age, CODEOWNERS, Renovate config, central `DevSecNinja/.github` Renovate extension, license, README, and workflows.
 - Open issue counts and branch rulesets are shown as unknown in the fast scan to avoid hitting GitHub REST API rate limits across many repositories.
 - Shows open Renovate pull requests and classifies auto-merge or manual merge from pull request text.
