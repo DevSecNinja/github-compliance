@@ -855,7 +855,7 @@ function renderCustomRepositories() {
     item.className = "custom-repo-item";
 
     const link = document.createElement("a");
-    link.href = `https://github.com/${fullName}`;
+    link.href = `https://github.com/${fullName.split("/").map(encodeURIComponent).join("/")}`;
     link.target = "_blank";
     link.rel = "noreferrer";
     link.textContent = fullName;
