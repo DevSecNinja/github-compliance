@@ -14,6 +14,7 @@ export function loadSettings() {
     owner: appConfig.defaultOwner,
     includeArchived: false,
     rememberDevice: false,
+    excludedTopic: appConfig.defaultExcludedTopic,
     ...stored,
     customRepositories: normalizeCustomRepositories(stored.customRepositories)
   };

@@ -162,6 +162,7 @@ export function evaluateRepository({ repo, files, rulesets, issueCount, now = ne
     description: repo.description || "No description",
     archived: repo.archived,
     private: repo.private,
+    topics: Array.isArray(repo.topics) ? repo.topics : [],
     defaultBranch: repo.default_branch,
     pushedAt: repo.pushed_at,
     pushedLabel: relativeTime(repo.pushed_at, now),

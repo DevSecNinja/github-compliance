@@ -45,6 +45,7 @@ const elements = {
   repoCheckFilter: document.querySelector("#repo-check-filter"),
   repoPushFilter: document.querySelector("#repo-push-filter"),
   repoVisibilityFilter: document.querySelector("#repo-visibility-filter"),
+  repoTagFilter: document.querySelector("#repo-tag-filter"),
   repoTextFilter: document.querySelector("#repo-text-filter"),
   clearRepoFilters: document.querySelector("#clear-repo-filters"),
   tabs: [...document.querySelectorAll(".tab-button")],
@@ -158,12 +159,21 @@ function bindEvents() {
   elements.repoCheckFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoPushFilter.addEventListener("change", () => renderCurrentScan());
   elements.repoVisibilityFilter.addEventListener("change", () => renderCurrentScan());
+  elements.repoTagFilter.addEventListener("change", () => {
+    const value = elements.repoTagFilter.value;
+    settings = { ...settings, excludedTopic: value === "all" ? "" : value };
+    if (!demoActive) {
+      saveSettings(settings);
+    }
+    renderCurrentScan();
+  });
   elements.repoTextFilter.addEventListener("input", () => renderCurrentScan());
   elements.clearRepoFilters.addEventListener("click", () => {
     elements.repoStatusFilter.value = "all";
     elements.repoCheckFilter.value = "all";
     elements.repoPushFilter.value = "all";
     elements.repoVisibilityFilter.value = "all";
+    elements.repoTagFilter.value = settings.excludedTopic || "all";
     elements.repoTextFilter.value = "";
     renderCurrentScan();
   });
@@ -502,6 +512,7 @@ function pauseActiveScan(message) {
 function renderScan(result, { cached = false } = {}) {
   const repositories = result.repositories ?? [];
   updateCheckFilterOptions(repositories);
+  updateTagFilterOptions(repositories);
   const filteredRepositories = filterRepositories(repositories);
   const ready = repositories.filter((repo) => repo.status === "pass").length;
   const review = repositories.filter((repo) => repo.status === "warn").length;
@@ -597,18 +608,21 @@ function filterRepositories(repositories) {
   const check = elements.repoCheckFilter.value;
   const lastPush = elements.repoPushFilter.value;
   const visibility = elements.repoVisibilityFilter.value;
+  const excludeTag = elements.repoTagFilter.value;
   const query = elements.repoTextFilter.value.trim().toLowerCase();
 
   return repositories.filter((repo) => {
     const checks = getRepositoryCheckItems(repo);
+    const topics = (repo.topics ?? []).map((topic) => topic.toLowerCase());
     const matchesStatus = status === "all" || repo.status === status;
     const matchesCheck = check === "all" || checks.some((item) => item.label === check);
     const matchesLastPush = lastPush === "all" || pushBucket(repo.pushedAt) === lastPush;
     const matchesVisibility = visibility === "all" || (visibility === "private" ? Boolean(repo.private) : !repo.private);
-    const searchable = [repo.name, repo.fullName, repo.description, relativeTime(repo.pushedAt), statusText(repo.status), ...checks.map((item) => item.label)].join("\n").toLowerCase();
+    const matchesTag = excludeTag === "all" || !topics.includes(excludeTag);
+    const searchable = [repo.name, repo.fullName, repo.description, relativeTime(repo.pushedAt), statusText(repo.status), ...checks.map((item) => item.label), ...(repo.topics ?? [])].join("\n").toLowerCase();
     const matchesQuery = !query || searchable.includes(query);
 
-    return matchesStatus && matchesCheck && matchesLastPush && matchesVisibility && matchesQuery;
+    return matchesStatus && matchesCheck && matchesLastPush && matchesVisibility && matchesTag && matchesQuery;
   });
 }
 
@@ -621,6 +635,24 @@ function updateCheckFilterOptions(repositories) {
     ...labels.map((label) => option(label, label))
   );
   elements.repoCheckFilter.value = labels.includes(selected) ? selected : "all";
+}
+
+function updateTagFilterOptions(repositories) {
+  const current = elements.repoTagFilter.value;
+  const selected = current && current !== "all" ? current.toLowerCase() : (settings.excludedTopic || "all");
+  const topics = [...new Set(repositories.flatMap((repo) => (repo.topics ?? []).map((topic) => topic.toLowerCase())))].sort((left, right) => left.localeCompare(right));
+  const values = topics.slice();
+
+  if (selected !== "all" && !values.includes(selected)) {
+    values.push(selected);
+    values.sort((left, right) => left.localeCompare(right));
+  }
+
+  elements.repoTagFilter.replaceChildren(
+    option("all", "Hide none"),
+    ...values.map((topic) => option(topic, topic))
+  );
+  elements.repoTagFilter.value = selected !== "all" && values.includes(selected) ? selected : "all";
 }
 
 function getRepositoryCheckItems(repo) {

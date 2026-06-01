@@ -9,7 +9,8 @@ export const appConfig = {
   requestTimeoutMs: 20_000,
   scanConcurrency: 1,
   stalePushDays: 180,
-  staleAutoMergeDays: 7
+  staleAutoMergeDays: 7,
+  defaultExcludedTopic: "unmanaged"
 };
 
 export const renovateStaleAutoMergeDays = appConfig.staleAutoMergeDays;
