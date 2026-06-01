@@ -640,7 +640,10 @@ function updateCheckFilterOptions(repositories) {
 function updateTagFilterOptions(repositories) {
   const current = elements.repoTagFilter.value;
   const selected = current && current !== "all" ? current.toLowerCase() : (settings.excludedTopic || "all");
-  const topics = [...new Set(repositories.flatMap((repo) => (repo.topics ?? []).map((topic) => topic.toLowerCase())))].sort((left, right) => left.localeCompare(right));
+  const repoNames = new Set(repositories.map((repo) => (repo.name ?? "").toLowerCase()).filter(Boolean));
+  const topics = [...new Set(repositories.flatMap((repo) => (repo.topics ?? []).map((topic) => topic.toLowerCase())))]
+    .filter((topic) => !repoNames.has(topic))
+    .sort((left, right) => left.localeCompare(right));
   const values = topics.slice();
 
   if (selected !== "all" && !values.includes(selected)) {

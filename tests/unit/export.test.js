@@ -22,6 +22,7 @@ function sampleScan() {
         pushedAt: "2026-05-29T10:00:00.000Z",
         issueCount: 2,
         status: "warn",
+        topics: ["travel", "planning"],
         checks: [
           { id: "name", status: "pass", label: "Name uses lowercase hyphens" },
           { id: "license", status: "fail", label: "Add a license file" }
@@ -80,6 +81,8 @@ describe("export module", () => {
     });
     assert.equal(data.repositories.length, 2);
     assert.equal(data.repositories[0].visibility, "private");
+    assert.deepEqual(data.repositories[0].topics, ["travel", "planning"]);
+    assert.deepEqual(data.repositories[1].topics, []);
     assert.equal(data.repositories[1].visibility, "public");
     assert.equal(data.renovatePullRequests.length, 1);
     assert.equal(data.renovatePullRequests[0].repository, "DevSecNinja/travel-prep");
@@ -106,6 +109,8 @@ describe("export module", () => {
 
     assert.equal(lines.length, 4);
     assert.match(lines[0], /^recordType,repository,name,status,classification/);
+    assert.match(lines[0], /,topics,/);
+    assert.match(csv, /travel; planning/);
     assert.match(csv, /repository,DevSecNinja\/travel-prep/);
     assert.match(csv, /renovate_pr,DevSecNinja\/travel-prep/);
     assert.match(csv, /Add a license file/);
