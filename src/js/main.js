@@ -1044,10 +1044,26 @@ async function loadBuildMeta() {
     const response = await fetch("./build-meta.json", { cache: "no-store" });
     if (response.ok) {
       const meta = await response.json();
-      elements.buildVersion.textContent = `Version ${meta.shortSha}`;
+      renderBuildVersion(meta);
     }
   } catch {
     elements.buildVersion.textContent = "Version local";
+  }
+}
+
+function renderBuildVersion(meta) {
+  const label = `Version ${meta.shortSha}`;
+  const isRealSha = /^[0-9a-f]{7,40}$/i.test(meta.sha ?? "");
+
+  if (meta.repository && isRealSha) {
+    const link = document.createElement("a");
+    link.href = `https://github.com/${meta.repository}/commit/${meta.sha}`;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = label;
+    elements.buildVersion.replaceChildren(link);
+  } else {
+    elements.buildVersion.textContent = label;
   }
 }
 

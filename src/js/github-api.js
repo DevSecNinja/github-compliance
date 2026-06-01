@@ -369,6 +369,7 @@ export class GitHubClient {
       renovate,
       license: findFirstPath(paths, ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"]),
       readme: findFirstPath(paths, ["README.md", "README"]),
+      devcontainer: tree.some((item) => item.type === "blob" && (item.path === ".devcontainer.json" || /^\.devcontainer\/(?:[^/]+\/)?devcontainer\.json$/.test(item.path))),
       workflows: tree.some((item) => item.path.startsWith(".github/workflows/") && item.type === "blob")
     };
   }

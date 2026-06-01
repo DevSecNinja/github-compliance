@@ -134,6 +134,7 @@ export function evaluateRepository({ repo, files, rulesets, issueCount, now = ne
     ...(protection.status === "unknown" ? [] : [buildCheck("protection", protection.status === "pass", protection.label, protection.label)]),
     buildCheck("license", Boolean(repo.license || files.license), "License is set", "Add a license file"),
     buildCheck("readme", Boolean(files.readme), "README is present", "Add README"),
+    buildCheck("devcontainer", Boolean(files.devcontainer), "Dev container is configured", "Add a devcontainer.json"),
     buildCheck("workflows", Boolean(files.workflows), "GitHub Actions workflow exists", "Add a workflow")
   ];
 
