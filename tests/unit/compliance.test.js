@@ -55,4 +55,27 @@ describe("compliance rules", () => {
     assert.equal(result.status, "fail");
     assert.equal(result.issueCount, 3);
   });
+
+  it("checks for a devcontainer configuration", () => {
+    const repo = {
+      id: 2,
+      name: "travel-prep",
+      full_name: "DevSecNinja/travel-prep",
+      html_url: "https://github.com/DevSecNinja/travel-prep",
+      description: "Trip helper",
+      archived: false,
+      private: false,
+      default_branch: "main",
+      pushed_at: "2026-05-24T10:00:00Z"
+    };
+
+    const baseFiles = { codeowners: null, renovate: null, license: { path: "LICENSE" }, readme: { path: "README.md" }, workflows: true };
+    const now = new Date("2026-05-24T12:00:00Z");
+
+    const without = evaluateRepository({ repo, files: { ...baseFiles, devcontainer: false }, rulesets: [], issueCount: 0, now });
+    const withConfig = evaluateRepository({ repo, files: { ...baseFiles, devcontainer: true }, rulesets: [], issueCount: 0, now });
+
+    assert.equal(without.checks.find((check) => check.id === "devcontainer").status, "fail");
+    assert.equal(withConfig.checks.find((check) => check.id === "devcontainer").status, "pass");
+  });
 });

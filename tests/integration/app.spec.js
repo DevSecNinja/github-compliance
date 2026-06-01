@@ -454,6 +454,7 @@ function tree() {
     { path: "renovate.json5", type: "blob" },
     { path: "LICENSE", type: "blob" },
     { path: "README.md", type: "blob" },
+    { path: ".devcontainer/devcontainer.json", type: "blob" },
     { path: ".github/workflows/pages.yml", type: "blob" }
   ];
 }

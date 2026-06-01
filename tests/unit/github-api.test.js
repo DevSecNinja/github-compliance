@@ -89,4 +89,30 @@ describe("GitHubClient", () => {
     assert.ok(searchedQueries.some((query) => query.includes("org:DevSecNinja")));
     assert.ok(searchedQueries.some((query) => query.includes("repo:other-org/widget")));
   });
+
+  it("detects a devcontainer.json in the repository tree", async () => {
+    const treeFor = (paths) => ({ tree: paths.map((path) => ({ path, type: "blob" })) });
+    const repo = { owner: { login: "DevSecNinja" }, name: "travel-prep", default_branch: "main" };
+
+    const makeClient = (paths) =>
+      new GitHubClient("token", {
+        fetcher: async (url) => {
+          if (new URL(url).pathname.includes("/git/trees/")) {
+            return jsonResponse(treeFor(paths));
+          }
+
+          return jsonResponse({ message: "Not found" }, { status: 404 });
+        }
+      });
+
+    const nested = await makeClient([".devcontainer/devcontainer.json", "README.md"]).getComplianceFiles(repo);
+    const root = await makeClient([".devcontainer.json"]).getComplianceFiles(repo);
+    const subfolder = await makeClient([".devcontainer/node/devcontainer.json"]).getComplianceFiles(repo);
+    const missing = await makeClient(["README.md", ".devcontainer/Dockerfile"]).getComplianceFiles(repo);
+
+    assert.equal(nested.devcontainer, true);
+    assert.equal(root.devcontainer, true);
+    assert.equal(subfolder.devcontainer, true);
+    assert.equal(missing.devcontainer, false);
+  });
 });
